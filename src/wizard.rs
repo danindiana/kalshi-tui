@@ -937,12 +937,7 @@ fn draw_monitoring(f: &mut Frame, area: Rect, state: &WizardState) {
         None    => return,
     };
 
-    // Background
-    f.render_widget(
-        Block::default().style(Style::default().bg(Color::Rgb(10, 10, 20))),
-        area,
-    );
-
+    // draw_wizard() already rendered the dark background over `area`
     let modal = centered_modal(88, 90, area);
     f.render_widget(Clear, modal);
 
@@ -1037,9 +1032,9 @@ fn draw_monitoring(f: &mut Frame, area: Rect, state: &WizardState) {
             "░".repeat(12usize.saturating_sub(filled))
         );
 
-        // Show last 20 chars of ticker (drops the date prefix)
+        // Show last 20 chars of ticker (drops the date prefix); .get() is byte-safe
         let tlen = pos.ticker.len();
-        let ticker_disp = if tlen > 20 { &pos.ticker[tlen - 20..] } else { &pos.ticker };
+        let ticker_disp = pos.ticker.get(tlen.saturating_sub(20)..).unwrap_or(&pos.ticker);
 
         let text = format!(
             "  {:<20}  {:>3}  {:>2}ct  ${:>5.2}  ${:>5.2}  ${:>+6.2}  {:>3}→{:<3}¢  ",
