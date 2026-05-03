@@ -12,7 +12,8 @@ import argparse
 import json
 import sqlite3
 import sys
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ── Path setup ────────────────────────────────────────────────────────────────
@@ -138,6 +139,42 @@ def _resolve_settlements(con: sqlite3.Connection, session_id: int, signer,
 
     con.commit()
     return wins, losses, pending
+
+
+def _mtm_snapshot(paper_trades: list, signer) -> tuple[float, float, float]:
+    """
+    Fetch current market prices for all unique tickers in paper_trades and
+    compute aggregate (total_cost, total_mtm, total_unrealized).
+    Used for the settlement wait-loop heartbeat.
+    """
+    price_cache: dict[str, dict] = {}
+    total_cost = total_mtm = 0.0
+
+    for pos in paper_trades:
+        if pos.get("status") not in (None, "pending"):
+            continue   # already settled, skip
+        ticker = pos["ticker"]
+        side   = pos["side"].lower()
+        count  = pos["count"]
+        cost   = pos["cost_dollars"]
+        total_cost += cost
+
+        if ticker not in price_cache:
+            try:
+                r   = signer.get(f"{KALSHI_BASE}/markets/{ticker}")
+                r.raise_for_status()
+                mkt = r.json().get("market", {})
+                price_cache[ticker] = {
+                    "yes": float(mkt.get("yes_ask", 0) or 0),
+                    "no":  float(mkt.get("no_ask",  0) or 0),
+                }
+            except Exception:
+                price_cache[ticker] = {"yes": 0.0, "no": 0.0}
+
+        cur  = price_cache[ticker]["yes"] if side == "yes" else price_cache[ticker]["no"]
+        total_mtm += count * cur
+
+    return total_cost, total_mtm, total_mtm - total_cost
 
 
 def _print_portfolio_snapshot(
@@ -286,10 +323,11 @@ def run_paper_session(balance: float, max_cycles: int, max_trades: int) -> None:
     con.commit()
 
     # Sizing mirrors auto_trader's ratchet, applied to the paper bankroll
-    virtual_balance = balance
-    total_trades    = 0
-    paper_trades    = []   # list of dicts for settlement resolution
-    open_positions  = []   # same list, kept for live portfolio snapshots
+    virtual_balance      = balance
+    total_trades         = 0
+    paper_trades         = []   # list of dicts for settlement resolution
+    open_positions       = []   # same list, kept for live portfolio snapshots
+    last_settlement_utc  = None # most recent settlement window observed
 
     cycle_num = 0
     while True:
@@ -318,6 +356,7 @@ def run_paper_session(balance: float, max_cycles: int, max_trades: int) -> None:
                 break
             continue
 
+        last_settlement_utc = settlement_utc
         local_settle = settlement_utc.astimezone().strftime("%H:%M %Z")
         print(f"[OK]   Settlement: {local_settle} ({mins:.0f} min)  {len(markets)} strikes")
 
@@ -425,6 +464,54 @@ def run_paper_session(balance: float, max_cycles: int, max_trades: int) -> None:
             open_positions, markets, mins,
             virtual_balance, balance, cycle_num,
         )
+
+    # ── Wait for settlement if window hasn't closed yet ───────────────────────
+    if paper_trades and last_settlement_utc is not None:
+        now = datetime.now(timezone.utc)
+        # Wait until 90 s after the settlement window closes (Kalshi finalization lag)
+        settle_deadline = last_settlement_utc + timedelta(seconds=90)
+        secs_until = (settle_deadline - now).total_seconds()
+
+        if secs_until > 0:
+            local_s = last_settlement_utc.astimezone().strftime("%H:%M %Z")
+            print(f"\n{'='*60}")
+            print(f"  Waiting for settlement at {local_s}")
+            print(f"  Monitoring {len(paper_trades)} open position(s) — press Ctrl+C to exit early")
+            print(f"{'='*60}")
+
+            POLL_SECS = 30
+            while True:
+                now        = datetime.now(timezone.utc)
+                remaining  = (last_settlement_utc - now).total_seconds()
+                since_close = (now - last_settlement_utc).total_seconds()
+
+                if remaining > 0:
+                    # Pre-settlement: print mark-to-market heartbeat
+                    try:
+                        cost, mtm, unrlzd = _mtm_snapshot(paper_trades, signer)
+                        sign = "+" if unrlzd >= 0 else ""
+                        print(
+                            f"[MTM]  cost=${cost:.2f}  mtm=${mtm:.2f}  "
+                            f"unrlzd=${unrlzd:+.2f}  "
+                            f"({remaining/60:.1f} min to settlement)"
+                        )
+                    except Exception as exc:
+                        print(f"[MTM]  (fetch error: {exc})  ({remaining/60:.1f} min)")
+                    sleep_secs = min(POLL_SECS, remaining)
+                    time.sleep(max(sleep_secs, 1))
+                else:
+                    # Post-settlement grace period — try to resolve
+                    if since_close >= 90:
+                        print(f"[OK]   Settlement window closed {since_close/60:.1f} min ago — resolving…")
+                        break
+                    else:
+                        print(f"[WAIT] Settlement closed — waiting for Kalshi to finalize… ({90 - since_close:.0f}s)")
+                        time.sleep(min(POLL_SECS, 90 - since_close + 5))
+
+                # Safety: don't wait more than 12 min past settlement
+                if (datetime.now(timezone.utc) - last_settlement_utc).total_seconds() > 720:
+                    print("[WARN] Still unresolved 12 min post-settlement — proceeding anyway.")
+                    break
 
     # ── Settlement resolution ─────────────────────────────────────────────────
     print(f"\n{'='*60}")
