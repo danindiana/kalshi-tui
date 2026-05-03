@@ -1,0 +1,72 @@
+// 19 — Safety net layers: concentric rings from outermost (last resort) to innermost (first check)
+digraph safety_layers {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    label="Safety net — from outermost (last resort) to innermost (first check)";
+    labelloc=t; fontcolor="#aaff66"; fontname="JetBrains Mono"; fontsize=14;
+
+    // Layer 0 — account-level
+    subgraph cluster_L0 {
+        label="L0 — Account-level (last resort)";
+        style="rounded,filled"; color="#ff3333"; fillcolor="#1a0808"; fontcolor="#ff9999"; penwidth=3;
+
+        l0a [label="MIN_BALANCE = $5\nbelow → halt immediately\n(wipe prevention)", fillcolor="#2a0a0a", color="#ff6666"];
+        l0b [label="DRAWDOWN_HALT = 50%\nportfolio vs HWM\n→ halt until reset", fillcolor="#2a0a0a", color="#ff6666"];
+        l0c [label="Balance API unavailable\n→ halt (can't compute limits)", fillcolor="#2a0a0a", color="#ff6666"];
+    }
+
+    // Layer 1 — daily/run budgets
+    subgraph cluster_L1 {
+        label="L1 — Budget caps (per day / per run)";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+
+        l1a [label="DAILY_LOSS_PCT × bankroll\n(100% = $bankroll/day)\nabsolute ceiling: $10,000", fillcolor="#2a1a0a", color="#ffcc66"];
+        l1b [label="MAX_RUN_PCT × bankroll\n(40% = $bankroll×0.4/run)\nabsolute ceiling: $100", fillcolor="#2a1a0a", color="#ffcc66"];
+    }
+
+    // Layer 2 — per-settlement / per-position
+    subgraph cluster_L2 {
+        label="L2 — Position-level (Phase A, new)";
+        style="rounded,filled"; color="#ff66ff"; fillcolor="#1a0a1a"; fontcolor="#ffccff"; penwidth=2;
+
+        l2a [label="★ MAX_EXPIRY_EXPOSURE_PCT = 50%\ntotal $ per settlement ≤ 50% portfolio\n(prevents single-settlement wipe)", fillcolor="#3a0a3a", color="#ff66ff"];
+        l2b [label="★ Netting reconciliation\nblock or net opposing-side signals\n(prevents YES+NO on same ticker)", fillcolor="#3a0a3a", color="#ff66ff"];
+        l2c [label="★ TOP-N cap = 3\nmax 3 orders per 10-min run\n(prevents strike sprawl)", fillcolor="#3a0a3a", color="#ff66ff"];
+    }
+
+    // Layer 3 — per-trade sizing
+    subgraph cluster_L3 {
+        label="L3 — Per-trade sizing";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#66ffff"; penwidth=2;
+
+        l3a [label="Fractional Kelly (0.33×)\nstake = bankroll × K(p,price) × 0.33", fillcolor="#0a2a2a", color="#66ffff"];
+        l3b [label="MAX_STAKE_PCT × bankroll (12%)\nabsolute ceiling: $25", fillcolor="#0a2a2a", color="#66ffff"];
+        l3c [label="★ Regime detector\nRSI < 20 or > 80 → stake × 0.5\n(fewer training samples at tails)", fillcolor="#0a2a2a", color="#66ffff"];
+    }
+
+    // Layer 4 — signal quality gates (innermost)
+    subgraph cluster_L4 {
+        label="L4 — Signal quality (first line of defense)";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        l4a [label="MIN_EDGE = 5%\nmodel_prob − market_price ≥ 0.05", fillcolor="#0a2a0a", color="#39ff14"];
+        l4b [label="★ MIN_CONVICTION = 0.15\n|clf_prob − 0.5| ≥ 0.15\n(no coin-flip trades)", fillcolor="#0a2a0a", color="#39ff14"];
+        l4c [label="Contract price ∈ [10¢, 95¢)\n(filters thin + at-limit contracts)", fillcolor="#0a2a0a", color="#39ff14"];
+        l4d [label="MAX_PROB_RATIO ≤ 3×\n(rejects implausible model vs market)", fillcolor="#0a2a0a", color="#39ff14"];
+        l4e [label="★ Ensemble routing\nhorizon → specialist model\n(mid bucket +3pp WR)", fillcolor="#0a2a0a", color="#39ff14"];
+    }
+
+    // Flow direction: signal must pass all inner gates before reaching outer ones
+    l4a -> l3a [label="passes all L4", color="#aaff66"];
+    l3a -> l2a [label="sized", color="#aaff66"];
+    l2a -> l1a [label="within expiry cap", color="#aaff66"];
+    l1a -> l0a [label="within daily budget", color="#aaff66"];
+
+    // Annotation
+    note [label="★ = added or modified 2026-04-15\n\nFailure at ANY layer →\ntrade is blocked or reduced.\nOuter layers are last-resort backstops;\ninner layers are the primary defense.",
+          shape=note, fillcolor="#2a1a0a", color="#ffcc66", fontcolor="#ffcc66"];
+}

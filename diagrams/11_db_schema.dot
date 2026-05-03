@@ -1,0 +1,94 @@
+// 11 — SQLite schema (ER-style) for the three runtime databases
+digraph db_schema {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", shape=plaintext];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=9, penwidth=1.3];
+
+    // ── auto_trader.db ──────────────────────────────────────────
+    runs [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="4" bgcolor="#1a2a1a" color="#39ff14">
+          <tr><td colspan="2" bgcolor="#0a3a0a"><font color="#aaffaa"><b>auto_trader.db :: runs</b></font></td></tr>
+          <tr><td><font color="#ffaa00">id</font></td><td>INTEGER PK</td></tr>
+          <tr><td>run_at</td><td>TEXT</td></tr>
+          <tr><td>current_price</td><td>REAL</td></tr>
+          <tr><td>model_prediction</td><td>REAL</td></tr>
+          <tr><td>mae_current</td><td>REAL</td></tr>
+          <tr><td>mins_to_expiry</td><td>REAL</td></tr>
+          <tr><td>rsi, volatility, momentum</td><td>REAL</td></tr>
+          <tr><td>opportunities</td><td>INTEGER</td></tr>
+          <tr><td>trades_placed</td><td>INTEGER</td></tr>
+          <tr><td>total_staked</td><td>REAL</td></tr>
+          <tr><td>dry_run</td><td>INTEGER</td></tr>
+        </table>>];
+
+    trades [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="4" bgcolor="#1a2a1a" color="#39ff14">
+          <tr><td colspan="2" bgcolor="#0a3a0a"><font color="#aaffaa"><b>auto_trader.db :: trades</b></font></td></tr>
+          <tr><td><font color="#ffaa00">id</font></td><td>INTEGER PK</td></tr>
+          <tr><td><font color="#ff66ff">run_id</font></td><td>INTEGER FK</td></tr>
+          <tr><td>placed_at</td><td>TEXT</td></tr>
+          <tr><td>ticker</td><td>TEXT</td></tr>
+          <tr><td>strike, price_cents</td><td>REAL / INT</td></tr>
+          <tr><td>side</td><td>'YES'|'NO'</td></tr>
+          <tr><td>count</td><td>INTEGER</td></tr>
+          <tr><td>cost_dollars</td><td>REAL</td></tr>
+          <tr><td>model_prob</td><td>REAL</td></tr>
+          <tr><td>market_price</td><td>REAL</td></tr>
+          <tr><td>edge, stake_pct</td><td>REAL</td></tr>
+          <tr><td>order_id</td><td>TEXT</td></tr>
+          <tr><td>status</td><td>'placed'|'error'|...</td></tr>
+          <tr><td>error</td><td>TEXT</td></tr>
+        </table>>];
+
+    // ── orderbook.db ────────────────────────────────────────────
+    snaps [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="4" bgcolor="#2a1a2a" color="#ff66ff">
+          <tr><td colspan="2" bgcolor="#3a0a3a"><font color="#ffccff"><b>orderbook.db :: snapshots</b></font></td></tr>
+          <tr><td><font color="#ffaa00">timestamp_ms</font></td><td>INTEGER PK</td></tr>
+          <tr><td>mid_price</td><td>REAL</td></tr>
+          <tr><td>spread</td><td>REAL</td></tr>
+          <tr><td>bid_imbalance</td><td>REAL</td></tr>
+          <tr><td>bid_depth_5</td><td>REAL</td></tr>
+          <tr><td>ask_depth_5</td><td>REAL</td></tr>
+          <tr><td>bid1, ask1</td><td>REAL</td></tr>
+          <tr><td>bid1_vol, ask1_vol</td><td>REAL</td></tr>
+        </table>>];
+
+    // ── predictions.db ──────────────────────────────────────────
+    preds [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="4" bgcolor="#2a1a0a" color="#ffaa00">
+          <tr><td colspan="2" bgcolor="#3a1a0a"><font color="#ffcc66"><b>predictions.db :: predictions</b></font></td></tr>
+          <tr><td><font color="#ffaa00">id</font></td><td>INTEGER PK</td></tr>
+          <tr><td>created_at</td><td>TEXT</td></tr>
+          <tr><td>series, strike, side</td><td>TEXT / REAL</td></tr>
+          <tr><td>price_at_entry</td><td>REAL</td></tr>
+          <tr><td>target_price</td><td>REAL</td></tr>
+          <tr><td>note</td><td>TEXT</td></tr>
+          <tr><td>outcome</td><td>TEXT</td></tr>
+          <tr><td>resolved_at, resolved_price</td><td>TEXT / REAL</td></tr>
+        </table>>];
+
+    // ── Runtime JSON files ──────────────────────────────────────
+    hwm [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="4" bgcolor="#1a1408" color="#ffaa00">
+          <tr><td colspan="2" bgcolor="#3a2a0a"><font color="#ffcc66"><b>hwm.json</b></font></td></tr>
+          <tr><td>hwm</td><td>float</td></tr>
+          <tr><td>portfolio_value</td><td>float</td></tr>
+          <tr><td>drawdown_pct</td><td>float</td></tr>
+          <tr><td>updated_at</td><td>ISO ts</td></tr>
+        </table>>];
+
+    // relationships
+    trades -> runs [label="run_id → runs.id", arrowhead=crow, color="#ff66ff"];
+
+    // informational — which module writes which table
+    auto [label="auto_trader.py", fillcolor="#0a3a0a", color="#39ff14", shape=oval, style=filled, fontcolor="#aaffaa"];
+    coll [label="orderbook_\ncollector.py", fillcolor="#0a3a3a", color="#66ffff", shape=oval, style=filled, fontcolor="#ccffff"];
+
+    auto -> runs   [label="INSERT", color="#aaff66"];
+    auto -> trades [label="INSERT", color="#aaff66"];
+    auto -> hwm    [label="WRITE",  color="#aaff66"];
+    coll -> snaps  [label="INSERT", color="#66ffff"];
+}

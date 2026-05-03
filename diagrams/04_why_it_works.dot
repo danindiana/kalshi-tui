@@ -1,0 +1,70 @@
+// 04 — Why it works: the EV math + the layered safety net
+digraph why_it_works {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6",
+          style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // ── The model ─────────────────────────────────────────────────
+    subgraph cluster_signal {
+        label="The signal — why edge exists";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        m1 [label="6.2M training samples\nhorizons 10–90 min\nchronological split", fillcolor="#0a2a0a", color="#39ff14"];
+        m2 [label="XGBoost classifier\nP(price > strike at T_settle)\ngiven {rel_ma, vol, momentum,\nRSI, ma_slope, amount, dist, mins}", fillcolor="#0a2a0a", color="#39ff14"];
+        m3 [label="Isotonic calibration\non held-out validation\n→ probabilities, not scores", fillcolor="#0a2a0a", color="#39ff14"];
+        m4 [label="Backtest gate:\nAUC 0.992  Brier-skill +87%\navg EV/bet +0.099  WR 68.3%", fillcolor="#0a2a0a", color="#39ff14"];
+
+        m1 -> m2 -> m3 -> m4;
+    }
+
+    // ── Where edge comes from ─────────────────────────────────────
+    subgraph cluster_edge {
+        label="Where the edge comes from";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff66ff"; penwidth=2;
+
+        e1 [label="Kalshi market makers price strikes\nlinearly in distance from spot\n(rough Gaussian assumption)", fillcolor="#2a0a2a", color="#ff66ff"];
+        e2 [label="Real BTC distribution at 10–90 min\nis fatter-tailed AND has\nshort-horizon momentum/mean-rev\nthe market doesn't fully price", fillcolor="#2a0a2a", color="#ff66ff"];
+        e3 [label="Classifier learns the residual\nbetween market-implied prob\nand empirical conditional prob", fillcolor="#2a0a2a", color="#ff66ff"];
+
+        e1 -> e3;
+        e2 -> e3;
+    }
+
+    // ── Sizing ─────────────────────────────────────────────────────
+    subgraph cluster_sizing {
+        label="Why we don't blow up — sizing";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#66ffff"; penwidth=2;
+
+        s1 [label="Fractional Kelly (0.33×)\nstake = bankroll × Kelly_fraction × edge", fillcolor="#0a2a2a", color="#66ffff"];
+        s2 [label="Layered ceilings:\nstake ≤ 12% bankroll AND ≤ $25\nrun ≤ 40% bankroll AND ≤ $100\nday ≤ 100%* bankroll AND ≤ $10k\n(* bankroll, not realized loss)", fillcolor="#0a2a2a", color="#66ffff"];
+        s3 [label="Top-N=3 per run (NEW)\ncaps strike count\n→ caps simultaneous correlated risk", fillcolor="#0a2a2a", color="#66ffff"];
+        s4 [label="Drawdown halt at 50%\non portfolio (cash+open)\nNOT cash alone", fillcolor="#0a2a2a", color="#66ffff"];
+
+        s1 -> s2 -> s3 -> s4;
+    }
+
+    // ── The loop ──────────────────────────────────────────────────
+    subgraph cluster_loop {
+        label="Why it survives bad ticks — the loop";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+
+        l1 [label="10-min cadence × 24h × 7d\n≈ 1000 tradeable settlements/wk\n→ law of large numbers", fillcolor="#2a1a0a", color="#ffcc66"];
+        l2 [label="Each settlement is\nsmall and uncorrelated*\n(* until they aren't — see\nstrike-sprawl failure)", fillcolor="#2a1a0a", color="#ffcc66"];
+        l3 [label="Position reconciliation (NEW)\nprevents stacking of\nopposing-side bets across runs", fillcolor="#2a1a0a", color="#ffcc66"];
+        l4 [label="Skip-on-failure everywhere:\nGPU OOM → CPU\nbalance API down → halt\nclassifier missing → skip\nNEVER fall back to wrong model", fillcolor="#2a1a0a", color="#ffcc66"];
+
+        l1 -> l2 -> l3 -> l4;
+    }
+
+    // ── Synthesis ─────────────────────────────────────────────────
+    win [label="EV-positive churn at small stakes,\nlayered halts on tail risk,\ncalibration verified weekly",
+         fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", penwidth=3, shape=oval];
+
+    m4 -> win;
+    e3 -> win;
+    s4 -> win;
+    l4 -> win;
+}

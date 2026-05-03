@@ -1,0 +1,68 @@
+// 04 — trade_outcomes view: how settled PnL gets onto the Status tab panels
+// Shows the SQL schema, the view's CASE logic, and which panels read it.
+digraph trade_outcomes_pipeline {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6",
+          style="filled,rounded", shape=box, fillcolor="#1a1f2e", penwidth=2, color="#39ff14"];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=9, penwidth=1.5];
+
+    // ── External write (Python auto-trader) ───────────────────────
+    subgraph cluster_py {
+        label="Python auto_trader.py (external writer)";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff00ff"; penwidth=2;
+        place  [label="place_order\non each trade", color="#ff66ff", fillcolor="#2a1a2a"];
+        refresh[label="refresh_settlements\nend of each run\nGET /portfolio/settlements", color="#ff66ff", fillcolor="#2a1a2a"];
+    }
+
+    // ── Base tables ───────────────────────────────────────────────
+    subgraph cluster_tables {
+        label="auto_trader.db  (base tables)";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffaa00"; penwidth=2;
+        t_runs   [label="runs\nrun_at · current_price · rsi\nvolatility · momentum", shape=cylinder, color="#ffcc66", fillcolor="#2a1a0a"];
+        t_trades [label="trades\nticker · strike · side · count\nprice_cents · cost_dollars · edge", shape=cylinder, color="#ffcc66", fillcolor="#2a1a0a"];
+        t_settle [label="settlements_raw\nticker · market_result\n(yes / no)", shape=cylinder, color="#ffcc66", fillcolor="#2a1a0a"];
+    }
+
+    // ── The view ──────────────────────────────────────────────────
+    subgraph cluster_view {
+        label="trade_outcomes (SQL view)";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#00ffff"; penwidth=3;
+        view [label="trade_outcomes\n-------------------------------\nLEFT JOIN settlements_raw\n\nCASE outcome:\n  side=YES + result=yes → win\n  side=NO  + result=no  → win\n  NULL result → unsettled\n  else → loss\n\nCASE pnl:\n  win  → count − cost_dollars\n  loss → −cost_dollars\n  unsettled → NULL\n\nCASE direction:\n  BULLISH_YES_above\n  BEARISH_YES_below\n  BEARISH_NO_above\n  BULLISH_NO_below",
+               color="#66ffff", fillcolor="#1a2a2a", penwidth=3, shape=note];
+    }
+
+    // ── Rust consumers ────────────────────────────────────────────
+    subgraph cluster_rust {
+        label="Rust TUI (reader)";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#39ff14"; penwidth=2;
+        load [label="sysinfo::load_outcomes\n2 SQL aggregates", color="#aaff66", fillcolor="#1a3a1a"];
+        side_row  [label="PerfSideRow\nn · wins · win% · avg cost (W/L) · net pnl", color="#aaff66", fillcolor="#1a3a1a"];
+        bkt_row   [label="PerfBucketRow\nbucket × side · n · win% · net pnl", color="#aaff66", fillcolor="#1a3a1a"];
+    }
+
+    // ── UI panels ─────────────────────────────────────────────────
+    subgraph cluster_ui {
+        label="Status tab (ui.rs)";
+        style="rounded,filled"; color="#ffff00"; fillcolor="#1a1a08"; fontcolor="#ffff00"; penwidth=2;
+        p_side [label="Performance by Side panel\ncolored PnL +\nyellow loss+NN% skew tag", color="#ffff66", fillcolor="#2a2a0a"];
+        p_bkt  [label="Size × Side (worst first) panel\n⚠ LEAK on large+negative", color="#ffff66", fillcolor="#2a2a0a"];
+    }
+
+    // ── Wiring ────────────────────────────────────────────────────
+    place   -> t_runs  [color="#ff00ff"];
+    place   -> t_trades[color="#ff00ff"];
+    refresh -> t_settle[color="#ff00ff", label="UPSERT"];
+
+    t_runs   -> view [style=dashed];
+    t_trades -> view [style=dashed];
+    t_settle -> view [style=dashed, label="LEFT JOIN"];
+
+    view -> load;
+    load -> side_row;
+    load -> bkt_row;
+
+    side_row -> p_side;
+    bkt_row  -> p_bkt;
+}

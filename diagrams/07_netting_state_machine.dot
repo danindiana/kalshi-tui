@@ -1,0 +1,49 @@
+// 07 — Net reconciliation state machine: (held × new_signal × conviction) → action
+digraph netting_sm {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    start [label="(held_side, new_signal_side, conviction)\ninputs for a single ticker",
+           fillcolor="#0a3a0a", color="#39ff14", penwidth=3, shape=oval];
+
+    // Level 1: are they opposing?
+    d1 [label="opposing?\n(held YES & new NO)\nor (held NO & new YES)", shape=diamond,
+        fillcolor="#1a2a1a", color="#39ff14"];
+
+    // Level 2a: non-opposing → always pass
+    pass1 [label="[PASS] same-side\nor flat → no conflict", shape=oval,
+           fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa"];
+
+    // Level 2b: opposing → check mode
+    d2 [label="NET_RECONCILIATION?", shape=diamond,
+        fillcolor="#1a2a1a", color="#39ff14"];
+
+    block [label="[SKIP-OPP] block-only mode\nopposing signal ignored\nregardless of strength",
+           fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+
+    // Level 3: netting mode — conviction check
+    d3 [label="conviction ≥ 0.30\n(2 × MIN_CONVICTION)?", shape=diamond,
+        fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff"];
+
+    net [label="[NET] strong opposing wins\norder placed;\nnet resolves on settlement",
+         fillcolor="#0a3a3a", color="#66ffff", fontcolor="#ccffff", shape=oval];
+
+    weak_skip [label="[SKIP-OPP] weak opposing\n(0.15 ≤ conv < 0.30)\nhold current position",
+               fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+
+    start -> d1;
+    d1 -> pass1 [label="no"];
+    d1 -> d2   [label="yes"];
+    d2 -> block [label="=0 (block-only)", color="#ff3333"];
+    d2 -> d3   [label="=1 (netting, default)"];
+    d3 -> net  [label="yes", color="#66ffff"];
+    d3 -> weak_skip [label="no", color="#ff3333"];
+
+    // Annotation — what gets filtered upstream
+    note [label="Note: conviction < 0.15 cases\nnever reach this gate —\nthey're skipped at the\nper-strike conviction gate\ninside find_opportunities",
+          shape=note, fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+    weak_skip -> note [style=dotted, arrowhead=none, color="#ffaa00"];
+}

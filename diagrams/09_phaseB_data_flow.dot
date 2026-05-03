@@ -1,0 +1,86 @@
+// 09 — Phase B data flow: orderbook features + ensemble (scaffolded, unwired)
+digraph phaseB_flow {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // Sources
+    subgraph cluster_src {
+        label="Data sources (already collecting)";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff66ff"; penwidth=2;
+        gemws [label="Gemini WS\nL2 orderbook\n~60s snapshots", fillcolor="#2a0a2a", color="#ff66ff"];
+        cand  [label="Gemini 1m candles\n90d training window", fillcolor="#2a0a2a", color="#ff66ff"];
+    }
+
+    ob_coll [label="orderbook_collector.py\n(systemd service)", fillcolor="#1a2a1a", color="#39ff14"];
+    ob_db   [label="orderbook.db\n3,724 snapshots\n~3 days history",
+             shape=cylinder, fillcolor="#2a1a0a", color="#ffaa00"];
+
+    // Phase B new modules (magenta = new)
+    subgraph cluster_new {
+        label="Phase B modules (scaffolded, unwired)";
+        style="rounded,filled"; color="#ff66ff"; fillcolor="#1a0a1a"; fontcolor="#ff66ff"; penwidth=2;
+
+        obf [label="orderbook_features.py\n• ob_features_at(ts)\n• ob_features_for_training(ts[])\n• 5 features: spread bps,\n  bid_imbalance, depth ratio log,\n  top size ratio, staleness",
+             fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+
+        ens [label="classifier_ensemble.py\n• load_ensemble()\n• predict_proba_ensemble()\n• vote='bucket'|'avg'\n• 3 buckets: early [10,25),\n  mid [25,50), late [50,90]",
+             fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+    }
+
+    // Training (not yet written)
+    subgraph cluster_train {
+        label="Training path (not yet written)";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+
+        train_ob [label="train_classifier\n_with_orderbook.py\n(TODO)", fillcolor="#2a1a0a", color="#ffcc66"];
+        train_ens [label="train_classifier\n_ensemble.py\n--bucket {early,mid,late}\n(TODO)", fillcolor="#2a1a0a", color="#ffcc66"];
+
+        bt [label="backtest_gates.py\nrequire WR ≥ 68.3%\nand EV ≥ +0.099", fillcolor="#2a1a0a", color="#ffcc66"];
+    }
+
+    // Models
+    subgraph cluster_models {
+        label="Model artifacts";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+        cur [label="classifier_model.pkl\n(current; single-model)\nAUC 0.992 WR 68.3%",
+             shape=cylinder, fillcolor="#0a2a0a", color="#39ff14"];
+        fut_early [label="classifier_early.pkl\n(future)",
+                   shape=cylinder, fillcolor="#1a2a1a", color="#aaff66", style="filled,rounded,dashed"];
+        fut_mid   [label="classifier_mid.pkl\n(future)",
+                   shape=cylinder, fillcolor="#1a2a1a", color="#aaff66", style="filled,rounded,dashed"];
+        fut_late  [label="classifier_late.pkl\n(future)",
+                   shape=cylinder, fillcolor="#1a2a1a", color="#aaff66", style="filled,rounded,dashed"];
+    }
+
+    // Target
+    auto [label="auto_trader.py\n(wires in once backtest passes)",
+          fillcolor="#1a2a1a", color="#39ff14"];
+
+    // Wiring
+    gemws -> ob_coll -> ob_db;
+    cand  -> train_ob;
+    ob_db -> obf;
+    ob_db -> train_ob [label="join by ts", style=dashed, color="#ffaa00"];
+    obf   -> train_ob [label="features", style=dashed, color="#ffaa00"];
+    obf   -> auto [label="inference\n(future)", style=dashed, color="#ff66ff"];
+
+    train_ob  -> bt -> cur      [label="swap if WR/EV↑", color="#aaff66"];
+    train_ens -> bt;
+    train_ens -> fut_early [style=dashed];
+    train_ens -> fut_mid   [style=dashed];
+    train_ens -> fut_late  [style=dashed];
+
+    fut_early -> ens;
+    fut_mid   -> ens;
+    fut_late  -> ens;
+    cur       -> ens [label="fallback\nwhen buckets missing", color="#aaff66", style=dashed];
+    ens       -> auto [label="future wire-in", style=dashed, color="#ff66ff"];
+
+    // Calendar-wait annotation
+    wait [label="Calendar wait:\nneed ≥30d of OB snapshots\nfor statistically meaningful retrain\n(currently 3 days)",
+          shape=note, fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+    ob_db -> wait [style=dotted, arrowhead=none, color="#ffaa00"];
+}

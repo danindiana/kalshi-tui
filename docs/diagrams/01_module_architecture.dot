@@ -1,0 +1,72 @@
+// 01 — Rust module architecture for kalshi-tui
+// Shows every .rs file under src/ and how they wire together at runtime.
+digraph kalshi_tui_modules {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", color="#39ff14",
+          style="filled,rounded", shape=box, fillcolor="#1a1f2e", penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // ── Entry ──────────────────────────────────────────────────────
+    subgraph cluster_entry {
+        label="Entry";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff00ff"; penwidth=2;
+        main [label="main.rs\ntokio runtime\nevent loop", fillcolor="#2a1a2a", color="#ff66ff"];
+    }
+
+    // ── Core state / control ───────────────────────────────────────
+    subgraph cluster_core {
+        label="Core state";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#39ff14"; penwidth=2;
+        app   [label="app.rs\nApp struct\ntab state, commands", fillcolor="#1a3a1a", color="#aaff66"];
+        model [label="model.rs\nModelOutput types\nIndicators / Opportunity"];
+    }
+
+    // ── I/O boundary ───────────────────────────────────────────────
+    subgraph cluster_io {
+        label="I/O boundary";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#00ffff"; penwidth=2;
+        api     [label="api.rs\nKalshi REST + classifier subprocess\nfetcher_loop", fillcolor="#1a2a2a", color="#66ffff"];
+        auth    [label="auth.rs\nRSA-PSS signer\nconfig loader", fillcolor="#1a2a2a", color="#66ffff"];
+        sysinfo [label="sysinfo.rs\nsystemd + DB + log tail\nperf analytics", fillcolor="#1a2a2a", color="#66ffff"];
+        db      [label="db.rs\nSQLite for predictions tab", fillcolor="#1a2a2a", color="#66ffff"];
+    }
+
+    // ── Presentation ───────────────────────────────────────────────
+    subgraph cluster_ui {
+        label="Presentation";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffaa00"; penwidth=2;
+        ui [label="ui.rs\nRatatui widgets\n5 tabs, ~1300 lines", fillcolor="#2a1a0a", color="#ffcc66"];
+    }
+
+    // ── External ───────────────────────────────────────────────────
+    subgraph cluster_ext {
+        label="External";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff00ff"; penwidth=2;
+        kapi    [label="Kalshi REST\n/markets /portfolio", shape=cloud, fillcolor="#2a1a2a", color="#ff66ff"];
+        pysub   [label="python classifier\npredict_classifier_json.py", shape=note, fillcolor="#2a1a2a", color="#ff66ff"];
+        systemd [label="systemctl show\n(subprocess)", shape=note, fillcolor="#2a1a2a", color="#ff66ff"];
+        atdb    [label="auto_trader.db\n(read-only)", shape=cylinder, fillcolor="#2a1a0a", color="#ffcc66"];
+        atlog   [label="auto_trader.log\n(tail)", shape=note, fillcolor="#2a1a0a", color="#ffcc66"];
+    }
+
+    // ── Wiring ─────────────────────────────────────────────────────
+    main -> app       [label="owns"];
+    main -> ui        [label="draws"];
+    app  -> api       [label="spawn tasks"];
+    app  -> sysinfo   [label="collect()"];
+    app  -> db        [label="predictions"];
+
+    api  -> auth      [label="sign headers"];
+    api  -> kapi      [color="#ff00ff", label="HTTPS"];
+    api  -> pysub     [color="#ff00ff", label="exec + JSON"];
+    api  -> model     [style=dashed, label="parses into"];
+
+    sysinfo -> systemd [color="#ff00ff"];
+    sysinfo -> atdb    [color="#ff00ff"];
+    sysinfo -> atlog   [color="#ff00ff"];
+
+    ui -> app       [label="reads", style=dashed];
+    ui -> model     [label="reads", style=dashed];
+}

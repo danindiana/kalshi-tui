@@ -1,0 +1,22 @@
+{
+  "trained_at": "2026-04-14T11:07:01.395831",
+  "mae": 797.5991212439981,
+  "mse": 759669.9464470452,
+  "rmse": 871.5904694562953,
+  "n_train": 109752,
+  "n_test": 19369,
+  "n_features": 6,
+  "feature_cols": [
+    "price",
+    "amount",
+    "price_ma",
+    "price_volatility",
+    "price_momentum",
+    "rsi"
+  ],
+  "use_ob": false,
+  "epochs_run": 14,
+  "seq_len": 15,
+  "days_of_data": 90,
+  "chronological_split": true
+}

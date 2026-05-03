@@ -1,0 +1,57 @@
+// 18 — Portfolio state machine: cash ↔ deployed ↔ settled → HWM/drawdown
+digraph portfolio_sm {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // States
+    idle [label="IDLE\ncash = portfolio\nno open positions\ndd = (hwm − cash)/hwm",
+          fillcolor="#0a2a2a", color="#66ffff", fontcolor="#ccffff", shape=oval, penwidth=3];
+
+    deploying [label="DEPLOYING\ncash → orders placed\nportfolio = cash + open_cost\nopen_cost from /portfolio/positions",
+               fillcolor="#1a2a1a", color="#39ff14"];
+
+    deployed [label="DEPLOYED\npositions live on Kalshi\nportfolio value includes\nmarket-value of open contracts\n(≈ cost basis until near-expiry)",
+              fillcolor="#1a3a1a", color="#aaff66"];
+
+    settling [label="SETTLING\nKalshi reads BTC index\ncontracts resolve to $0 or $1\ncash credited, positions vanish",
+              fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff"];
+
+    // Transitions
+    idle -> deploying [label="timer fires\nopps found"];
+    deploying -> deployed [label="orders filled"];
+    deployed -> settling [label="settlement tick"];
+    settling -> idle [label="cash updated"];
+    deployed -> deploying [label="next 10-min tick\n(add to existing positions)"];
+
+    // HWM/drawdown calculation
+    subgraph cluster_hwm {
+        label="HWM tracking (every tick)";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+
+        calc [label="portfolio_value =\n  GET /portfolio/balance (cash)\n+ GET /portfolio/positions (cost basis)\n\nhwm = max(hwm, portfolio_value)\ndd  = (hwm − portfolio_value) / hwm",
+              fillcolor="#2a1a0a", color="#ffaa00"];
+    }
+
+    // Halt state
+    halted [label="HALTED\ndd ≥ DRAWDOWN_HALT (50%)\nno orders placed\ntimer still fires (to check recovery)",
+            fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=doubleoctagon, penwidth=3];
+
+    // Recovery
+    reset [label="HWM RESET\n(manual operator action)\nhwm ← current portfolio\ndd ← 0%",
+           fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66", shape=note];
+
+    // Wiring to halt/recovery
+    idle      -> calc [style=dashed, color="#ffaa00"];
+    deployed  -> calc [style=dashed, color="#ffaa00"];
+    calc      -> halted [label="dd ≥ 50%", color="#ff3333"];
+    halted    -> idle [label="settlement recovers\n→ dd < 50%\n(rare without HWM reset)", style=dashed, color="#aaff66"];
+    reset     -> idle [label="operator resets hwm.json", color="#ffaa00"];
+
+    // Day boundary
+    day [label="midnight boundary\ndaily_deployed_total resets to 0\n(no effect on drawdown halt)",
+         fillcolor="#1a2a1a", color="#39ff14", shape=note];
+    idle -> day [style=dotted, arrowhead=none, color="#39ff14"];
+}

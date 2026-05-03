@@ -1,0 +1,299 @@
+{
+  "early": {
+    "label": "early h=15",
+    "n_total": 174204,
+    "YES": {
+      "n": 87384,
+      "pct": 50.16,
+      "mean_prob": 0.9496,
+      "mean_actual": 0.9598,
+      "overconfidence": -0.0102,
+      "brier": 0.0306,
+      "log_loss": 0.1072,
+      "reliability": [
+        {
+          "bin": "0.50-0.60",
+          "n": 2846,
+          "claimed": 0.5644,
+          "actual": 0.5871,
+          "gap": -0.0227
+        },
+        {
+          "bin": "0.60-0.70",
+          "n": 2647,
+          "claimed": 0.6663,
+          "actual": 0.7253,
+          "gap": -0.0591
+        },
+        {
+          "bin": "0.70-0.80",
+          "n": 2890,
+          "claimed": 0.7679,
+          "actual": 0.8187,
+          "gap": -0.0507
+        },
+        {
+          "bin": "0.80-0.90",
+          "n": 4776,
+          "claimed": 0.8488,
+          "actual": 0.8859,
+          "gap": -0.0371
+        },
+        {
+          "bin": "0.90-1.00",
+          "n": 74225,
+          "claimed": 0.988,
+          "actual": 0.9926,
+          "gap": -0.0047
+        }
+      ]
+    },
+    "NO": {
+      "n": 86820,
+      "pct": 49.84,
+      "mean_prob": 0.9559,
+      "mean_actual": 0.9582,
+      "overconfidence": -0.0023,
+      "brier": 0.0319,
+      "log_loss": 0.112,
+      "reliability": [
+        {
+          "bin": "0.50-0.60",
+          "n": 1160,
+          "claimed": 0.527,
+          "actual": 0.5509,
+          "gap": -0.0239
+        },
+        {
+          "bin": "0.60-0.70",
+          "n": 2575,
+          "claimed": 0.646,
+          "actual": 0.645,
+          "gap": 0.001
+        },
+        {
+          "bin": "0.70-0.80",
+          "n": 3318,
+          "claimed": 0.7485,
+          "actual": 0.7676,
+          "gap": -0.0192
+        },
+        {
+          "bin": "0.80-0.90",
+          "n": 3691,
+          "claimed": 0.8457,
+          "actual": 0.8588,
+          "gap": -0.0131
+        },
+        {
+          "bin": "0.90-1.00",
+          "n": 76076,
+          "claimed": 0.9873,
+          "actual": 0.9881,
+          "gap": -0.0008
+        }
+      ]
+    },
+    "bucket": "early",
+    "horizon": 15,
+    "pkl": "/home/jeb/programs/gemini_trader/time_series/classifier_early.pkl"
+  },
+  "mid": {
+    "label": "mid h=30",
+    "n_total": 174069,
+    "YES": {
+      "n": 85448,
+      "pct": 49.09,
+      "mean_prob": 0.939,
+      "mean_actual": 0.9529,
+      "overconfidence": -0.014,
+      "brier": 0.0385,
+      "log_loss": 0.1385,
+      "reliability": [
+        {
+          "bin": "0.50-0.60",
+          "n": 2165,
+          "claimed": 0.5755,
+          "actual": 0.649,
+          "gap": -0.0735
+        },
+        {
+          "bin": "0.60-0.70",
+          "n": 3385,
+          "claimed": 0.6718,
+          "actual": 0.7223,
+          "gap": -0.0505
+        },
+        {
+          "bin": "0.70-0.80",
+          "n": 3489,
+          "claimed": 0.7467,
+          "actual": 0.8077,
+          "gap": -0.061
+        },
+        {
+          "bin": "0.80-0.90",
+          "n": 6885,
+          "claimed": 0.8381,
+          "actual": 0.8889,
+          "gap": -0.0508
+        },
+        {
+          "bin": "0.90-1.00",
+          "n": 69524,
+          "claimed": 0.9829,
+          "actual": 0.9873,
+          "gap": -0.0043
+        }
+      ]
+    },
+    "NO": {
+      "n": 88621,
+      "pct": 50.91,
+      "mean_prob": 0.9298,
+      "mean_actual": 0.9274,
+      "overconfidence": 0.0025,
+      "brier": 0.0517,
+      "log_loss": 0.1779,
+      "reliability": [
+        {
+          "bin": "0.50-0.60",
+          "n": 4865,
+          "claimed": 0.5399,
+          "actual": 0.517,
+          "gap": 0.0229
+        },
+        {
+          "bin": "0.60-0.70",
+          "n": 2040,
+          "claimed": 0.6266,
+          "actual": 0.6711,
+          "gap": -0.0445
+        },
+        {
+          "bin": "0.70-0.80",
+          "n": 4108,
+          "claimed": 0.7493,
+          "actual": 0.7483,
+          "gap": 0.001
+        },
+        {
+          "bin": "0.80-0.90",
+          "n": 7653,
+          "claimed": 0.8635,
+          "actual": 0.8505,
+          "gap": 0.0129
+        },
+        {
+          "bin": "0.90-1.00",
+          "n": 69955,
+          "claimed": 0.9836,
+          "actual": 0.9823,
+          "gap": 0.0013
+        }
+      ]
+    },
+    "bucket": "mid",
+    "horizon": 30,
+    "pkl": "/home/jeb/programs/gemini_trader/time_series/classifier_mid.pkl"
+  },
+  "late": {
+    "label": "late h=70",
+    "n_total": 173709,
+    "YES": {
+      "n": 85947,
+      "pct": 49.48,
+      "mean_prob": 0.8965,
+      "mean_actual": 0.9197,
+      "overconfidence": -0.0232,
+      "brier": 0.0632,
+      "log_loss": 0.2199,
+      "reliability": [
+        {
+          "bin": "0.50-0.60",
+          "n": 4130,
+          "claimed": 0.5555,
+          "actual": 0.6087,
+          "gap": -0.0532
+        },
+        {
+          "bin": "0.60-0.70",
+          "n": 5702,
+          "claimed": 0.653,
+          "actual": 0.704,
+          "gap": -0.051
+        },
+        {
+          "bin": "0.70-0.80",
+          "n": 6968,
+          "claimed": 0.7378,
+          "actual": 0.8153,
+          "gap": -0.0775
+        },
+        {
+          "bin": "0.80-0.90",
+          "n": 11969,
+          "claimed": 0.858,
+          "actual": 0.8907,
+          "gap": -0.0327
+        },
+        {
+          "bin": "0.90-1.00",
+          "n": 57178,
+          "claimed": 0.9729,
+          "actual": 0.9825,
+          "gap": -0.0096
+        }
+      ]
+    },
+    "NO": {
+      "n": 87762,
+      "pct": 50.52,
+      "mean_prob": 0.9056,
+      "mean_actual": 0.8911,
+      "overconfidence": 0.0144,
+      "brier": 0.08,
+      "log_loss": 0.2767,
+      "reliability": [
+        {
+          "bin": "0.50-0.60",
+          "n": 3697,
+          "claimed": 0.5453,
+          "actual": 0.522,
+          "gap": 0.0233
+        },
+        {
+          "bin": "0.60-0.70",
+          "n": 6338,
+          "claimed": 0.661,
+          "actual": 0.6333,
+          "gap": 0.0277
+        },
+        {
+          "bin": "0.70-0.80",
+          "n": 6609,
+          "claimed": 0.7533,
+          "actual": 0.7367,
+          "gap": 0.0166
+        },
+        {
+          "bin": "0.80-0.90",
+          "n": 12708,
+          "claimed": 0.863,
+          "actual": 0.8484,
+          "gap": 0.0146
+        },
+        {
+          "bin": "0.90-1.00",
+          "n": 58410,
+          "claimed": 0.9814,
+          "actual": 0.9693,
+          "gap": 0.0122
+        }
+      ]
+    },
+    "bucket": "late",
+    "horizon": 70,
+    "pkl": "/home/jeb/programs/gemini_trader/time_series/classifier_late.pkl"
+  }
+}

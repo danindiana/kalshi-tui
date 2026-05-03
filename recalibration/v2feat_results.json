@@ -1,0 +1,167 @@
+{
+  "early": {
+    "bucket": "early",
+    "before": {
+      "YES": {
+        "n": 87384,
+        "band_n": 12256,
+        "band_claimed": 0.748,
+        "band_actual": 0.7933,
+        "band_over": -0.0453,
+        "band_brier": 0.1563,
+        "band_log_loss": 0.4864
+      },
+      "NO": {
+        "n": 86820,
+        "band_n": 9759,
+        "band_claimed": 0.755,
+        "band_actual": 0.7671,
+        "band_over": -0.0121,
+        "band_brier": 0.1708,
+        "band_log_loss": 0.521
+      }
+    },
+    "after": {
+      "YES": {
+        "n": 87238,
+        "band_n": 11892,
+        "band_claimed": 0.7299,
+        "band_actual": 0.7739,
+        "band_over": -0.044,
+        "band_brier": 0.1663,
+        "band_log_loss": 0.51
+      },
+      "NO": {
+        "n": 86966,
+        "band_n": 9560,
+        "band_claimed": 0.7504,
+        "band_actual": 0.7612,
+        "band_over": -0.0108,
+        "band_brier": 0.174,
+        "band_log_loss": 0.5286
+      }
+    },
+    "importance": {
+      "price_rel_ma": 0.001,
+      "price_volatility": 0.0022,
+      "price_momentum": 0.0009,
+      "rsi": 0.0012,
+      "ma_slope": 0.001,
+      "amount": 0.002,
+      "strike_dist_pct": 0.124,
+      "horizon_mins": 0.0014,
+      "strike_z": 0.2558,
+      "market_implied_prob": 0.6105
+    }
+  },
+  "mid": {
+    "bucket": "mid",
+    "before": {
+      "YES": {
+        "n": 85448,
+        "band_n": 15572,
+        "band_claimed": 0.7521,
+        "band_actual": 0.8073,
+        "band_over": -0.0552,
+        "band_brier": 0.151,
+        "band_log_loss": 0.4752
+      },
+      "NO": {
+        "n": 88621,
+        "band_n": 15519,
+        "band_claimed": 0.7704,
+        "band_actual": 0.7713,
+        "band_over": -0.0009,
+        "band_brier": 0.1682,
+        "band_log_loss": 0.5149
+      }
+    },
+    "after": {
+      "YES": {
+        "n": 85616,
+        "band_n": 15006,
+        "band_claimed": 0.7595,
+        "band_actual": 0.8125,
+        "band_over": -0.0529,
+        "band_brier": 0.1485,
+        "band_log_loss": 0.4698
+      },
+      "NO": {
+        "n": 88453,
+        "band_n": 14691,
+        "band_claimed": 0.7566,
+        "band_actual": 0.7526,
+        "band_over": 0.004,
+        "band_brier": 0.1771,
+        "band_log_loss": 0.5361
+      }
+    },
+    "importance": {
+      "price_rel_ma": 0.0012,
+      "price_volatility": 0.0028,
+      "price_momentum": 0.0011,
+      "rsi": 0.0014,
+      "ma_slope": 0.0011,
+      "amount": 0.0027,
+      "strike_dist_pct": 0.0502,
+      "horizon_mins": 0.0014,
+      "strike_z": 0.2749,
+      "market_implied_prob": 0.6632
+    }
+  },
+  "late": {
+    "bucket": "late",
+    "before": {
+      "YES": {
+        "n": 85947,
+        "band_n": 26703,
+        "band_claimed": 0.7614,
+        "band_actual": 0.8112,
+        "band_over": -0.0498,
+        "band_brier": 0.1477,
+        "band_log_loss": 0.4659
+      },
+      "NO": {
+        "n": 87762,
+        "band_n": 27594,
+        "band_claimed": 0.7697,
+        "band_actual": 0.7516,
+        "band_over": 0.0181,
+        "band_brier": 0.176,
+        "band_log_loss": 0.5316
+      }
+    },
+    "after": {
+      "YES": {
+        "n": 86895,
+        "band_n": 26621,
+        "band_claimed": 0.7647,
+        "band_actual": 0.8145,
+        "band_over": -0.0499,
+        "band_brier": 0.1458,
+        "band_log_loss": 0.4616
+      },
+      "NO": {
+        "n": 86814,
+        "band_n": 24471,
+        "band_claimed": 0.7651,
+        "band_actual": 0.7414,
+        "band_over": 0.0237,
+        "band_brier": 0.1837,
+        "band_log_loss": 0.5505
+      }
+    },
+    "importance": {
+      "price_rel_ma": 0.002,
+      "price_volatility": 0.005,
+      "price_momentum": 0.0019,
+      "rsi": 0.0023,
+      "ma_slope": 0.0021,
+      "amount": 0.005,
+      "strike_dist_pct": 0.3695,
+      "horizon_mins": 0.0032,
+      "strike_z": 0.2395,
+      "market_implied_prob": 0.3696
+    }
+  }
+}

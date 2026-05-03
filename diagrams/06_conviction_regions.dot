@@ -1,0 +1,49 @@
+// 06 — Conviction gate — regions of clf_prob space and what happens in each
+digraph conviction_regions {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    clf [label="clf_prob output\n(calibrated P(price > strike))", fillcolor="#1a2a1a", color="#39ff14", penwidth=3];
+
+    // Probability regions
+    subgraph cluster_regions {
+        label="Classifier output regions  (MIN_CONVICTION = 0.15, override = 0.30)";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#39ff14"; penwidth=2;
+
+        strongNO  [label="clf_prob ∈ [0.00, 0.20]\nSTRONG NO\nconviction ≥ 0.30", fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        modNO     [label="clf_prob ∈ [0.20, 0.35]\nMODERATE NO\nconviction ∈ [0.15, 0.30)", fillcolor="#1a2a1a", color="#aaff66"];
+        coinflip  [label="clf_prob ∈ [0.35, 0.65]\nCOIN-FLIP ZONE\nconviction < 0.15", fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999"];
+        modYES    [label="clf_prob ∈ [0.65, 0.80]\nMODERATE YES\nconviction ∈ [0.15, 0.30)", fillcolor="#1a2a1a", color="#aaff66"];
+        strongYES [label="clf_prob ∈ [0.80, 1.00]\nSTRONG YES\nconviction ≥ 0.30", fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+
+        // Order them left-to-right
+        strongNO -> modNO -> coinflip -> modYES -> strongYES [style=invis];
+    }
+
+    // Outcomes
+    skip     [label="[SKIP] conviction < 0.15\nno trade", fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+    trade    [label="trade (NO)\nif edge ≥ 5%", fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", shape=oval];
+    trade2   [label="trade (YES)\nif edge ≥ 5%", fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", shape=oval];
+    netable  [label="trade, and can\nnet-override opposing\nopen position", fillcolor="#0a3a3a", color="#66ffff", fontcolor="#ccffff", shape=oval];
+
+    clf -> strongNO;
+    clf -> modNO;
+    clf -> coinflip;
+    clf -> modYES;
+    clf -> strongYES;
+
+    strongNO  -> netable  [label="can override",  color="#66ffff"];
+    modNO     -> trade    [label="trade only",     color="#39ff14"];
+    coinflip  -> skip     [label="blocked",        color="#ff3333"];
+    modYES    -> trade2   [label="trade only",     color="#39ff14"];
+    strongYES -> netable  [label="can override",   color="#66ffff"];
+
+    // Annotation box
+    regression [label="Regression — 2026-04-15 04:00\nT73699 NO had clf_prob=0.614\n→ conviction=0.114 < 0.15\n→ lands in COIN-FLIP ZONE\n→ [SKIP] — would not have placed",
+                shape=note, fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+
+    coinflip -> regression [style=dotted, arrowhead=none, color="#ffaa00"];
+}

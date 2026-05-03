@@ -1,0 +1,179 @@
+{
+  "early": {
+    "bucket": "early",
+    "pkl_in": "/home/jeb/programs/gemini_trader/time_series/classifier_early.pkl",
+    "pkl_out": "/home/jeb/programs/gemini_trader/time_series/classifier_early_v3.pkl",
+    "fit_stats": {
+      "high_band_n": 8107,
+      "high_out_n": 41319,
+      "low_band_n": 7249,
+      "low_out_n": 41983
+    },
+    "before": {
+      "name": "before",
+      "n_total": 174204,
+      "YES": {
+        "n": 87384,
+        "band_n": 12256,
+        "band_pct": 14.03,
+        "band_claimed": 0.748,
+        "band_actual": 0.7933,
+        "band_over": -0.0453,
+        "band_brier": 0.1563,
+        "band_log_loss": 0.4864
+      },
+      "NO": {
+        "n": 86820,
+        "band_n": 9759,
+        "band_pct": 11.24,
+        "band_claimed": 0.755,
+        "band_actual": 0.7671,
+        "band_over": -0.0121,
+        "band_brier": 0.1708,
+        "band_log_loss": 0.521
+      }
+    },
+    "after": {
+      "name": "after",
+      "n_total": 174204,
+      "YES": {
+        "n": 88335,
+        "band_n": 12363,
+        "band_pct": 14.0,
+        "band_claimed": 0.7451,
+        "band_actual": 0.7905,
+        "band_over": -0.0454,
+        "band_brier": 0.1573,
+        "band_log_loss": 0.4885
+      },
+      "NO": {
+        "n": 85869,
+        "band_n": 9790,
+        "band_pct": 11.4,
+        "band_claimed": 0.7546,
+        "band_actual": 0.7663,
+        "band_over": -0.0117,
+        "band_brier": 0.1711,
+        "band_log_loss": 0.5216
+      }
+    }
+  },
+  "mid": {
+    "bucket": "mid",
+    "pkl_in": "/home/jeb/programs/gemini_trader/time_series/classifier_mid.pkl",
+    "pkl_out": "/home/jeb/programs/gemini_trader/time_series/classifier_mid_v3.pkl",
+    "fit_stats": {
+      "high_band_n": 11304,
+      "high_out_n": 38143,
+      "low_band_n": 9926,
+      "low_out_n": 39150
+    },
+    "before": {
+      "name": "before",
+      "n_total": 174069,
+      "YES": {
+        "n": 85448,
+        "band_n": 15572,
+        "band_pct": 18.22,
+        "band_claimed": 0.7521,
+        "band_actual": 0.8073,
+        "band_over": -0.0552,
+        "band_brier": 0.151,
+        "band_log_loss": 0.4752
+      },
+      "NO": {
+        "n": 88621,
+        "band_n": 15519,
+        "band_pct": 17.51,
+        "band_claimed": 0.7704,
+        "band_actual": 0.7713,
+        "band_over": -0.0009,
+        "band_brier": 0.1682,
+        "band_log_loss": 0.5149
+      }
+    },
+    "after": {
+      "name": "after",
+      "n_total": 174069,
+      "YES": {
+        "n": 87070,
+        "band_n": 15710,
+        "band_pct": 18.04,
+        "band_claimed": 0.7509,
+        "band_actual": 0.8046,
+        "band_over": -0.0537,
+        "band_brier": 0.152,
+        "band_log_loss": 0.4774
+      },
+      "NO": {
+        "n": 86999,
+        "band_n": 15560,
+        "band_pct": 17.89,
+        "band_claimed": 0.77,
+        "band_actual": 0.7702,
+        "band_over": -0.0002,
+        "band_brier": 0.1686,
+        "band_log_loss": 0.5157
+      }
+    }
+  },
+  "late": {
+    "bucket": "late",
+    "pkl_in": "/home/jeb/programs/gemini_trader/time_series/classifier_late.pkl",
+    "pkl_out": "/home/jeb/programs/gemini_trader/time_series/classifier_late_v3.pkl",
+    "fit_stats": {
+      "high_band_n": 17291,
+      "high_out_n": 31605,
+      "low_band_n": 15890,
+      "low_out_n": 33377
+    },
+    "before": {
+      "name": "before",
+      "n_total": 173709,
+      "YES": {
+        "n": 85947,
+        "band_n": 26703,
+        "band_pct": 31.07,
+        "band_claimed": 0.7614,
+        "band_actual": 0.8112,
+        "band_over": -0.0498,
+        "band_brier": 0.1477,
+        "band_log_loss": 0.4659
+      },
+      "NO": {
+        "n": 87762,
+        "band_n": 27594,
+        "band_pct": 31.44,
+        "band_claimed": 0.7697,
+        "band_actual": 0.7516,
+        "band_over": 0.0181,
+        "band_brier": 0.176,
+        "band_log_loss": 0.5316
+      }
+    },
+    "after": {
+      "name": "after",
+      "n_total": 173709,
+      "YES": {
+        "n": 86012,
+        "band_n": 26760,
+        "band_pct": 31.11,
+        "band_claimed": 0.7609,
+        "band_actual": 0.8105,
+        "band_over": -0.0496,
+        "band_brier": 0.1479,
+        "band_log_loss": 0.4664
+      },
+      "NO": {
+        "n": 87697,
+        "band_n": 24619,
+        "band_pct": 28.07,
+        "band_claimed": 0.7705,
+        "band_actual": 0.7508,
+        "band_over": 0.0197,
+        "band_brier": 0.1786,
+        "band_log_loss": 0.5383
+      }
+    }
+  }
+}

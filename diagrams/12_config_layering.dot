@@ -1,0 +1,71 @@
+// 12 — Config resolution: how a single env var makes it from file to decision
+digraph config {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // Layer 1: systemd unit
+    svc [label="/etc/systemd/system/\nkalshi-auto-trader.service\n\nEnvironment=\"MIN_CONVICTION=0.15\"\nEnvironment=\"MAX_EXPIRY_EXPOSURE_PCT=0.50\"\n... (20+ Environment lines)",
+         fillcolor="#0a2a2a", color="#66ffff", fontcolor="#ccffff", penwidth=3];
+
+    // Layer 2: systemd loads
+    reload [label="systemctl daemon-reload\n(required after edits)", fillcolor="#1a2a1a", color="#39ff14"];
+
+    // Layer 3: process env
+    proc [label="child process env\n(inherited by auto_trader.py)", fillcolor="#1a2a1a", color="#39ff14"];
+
+    // Layer 4: code default
+    code [label="os.environ.get(\"MIN_CONVICTION\", \"0.15\")\nin auto_trader.py config block",
+          fillcolor="#1a2a1a", color="#39ff14"];
+
+    // Layer 5: runtime
+    rt [label="MIN_CONVICTION = 0.15\n(module-level float)", fillcolor="#1a3a1a", color="#aaff66"];
+
+    // Layer 6: decision
+    use [label="inside find_opportunities:\nif conviction < MIN_CONVICTION: skip",
+         fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", penwidth=3];
+
+    svc -> reload -> proc -> code -> rt -> use;
+
+    // Overrides — side panel
+    subgraph cluster_override {
+        label="Override paths";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+
+        cli   [label="CLI one-shot:\nMIN_CONVICTION=0.20 python auto_trader.py",
+               fillcolor="#2a1a0a", color="#ffaa00"];
+        dry   [label="DRY_RUN=1 override\nfor testing without real orders",
+               fillcolor="#2a1a0a", color="#ffaa00"];
+        drop  [label="Back-compat:\nif unset, code default = 0.15\n(deployed before service patch)",
+               fillcolor="#2a1a0a", color="#ffaa00"];
+    }
+
+    cli  -> proc [style=dashed, color="#ffaa00", label="bypass service"];
+    dry  -> proc [style=dashed, color="#ffaa00"];
+    drop -> code [style=dashed, color="#ffaa00"];
+
+    // Complete env var inventory
+    vars [label=<
+        <table border="0" cellborder="1" cellspacing="0" cellpadding="3" bgcolor="#1a2a1a" color="#39ff14">
+          <tr><td colspan="2" bgcolor="#0a3a0a"><font color="#aaffaa"><b>All env vars (service file)</b></font></td></tr>
+          <tr><td>DRY_RUN</td><td>0 (LIVE)</td></tr>
+          <tr><td>MAX_BANKROLL</td><td>500</td></tr>
+          <tr><td>MAX_STAKE_PCT / _DOLLARS</td><td>0.12 / 25</td></tr>
+          <tr><td>MAX_RUN_PCT / _DOLLARS</td><td>0.40 / 100</td></tr>
+          <tr><td>DAILY_LOSS_PCT / _LIMIT</td><td>100.0 / 10000</td></tr>
+          <tr><td>MIN_BALANCE, DRAWDOWN_HALT</td><td>5 / 0.50</td></tr>
+          <tr><td>MIN_EDGE, FRACTIONAL_KELLY</td><td>0.05 / 0.33</td></tr>
+          <tr><td>MIN/MAX_CONTRACT_CENTS</td><td>10 / 95</td></tr>
+          <tr><td>MAX_PROB_RATIO</td><td>3.0</td></tr>
+          <tr><td>MAX_SETTLEMENT_WINDOW_MINUTES</td><td>90</td></tr>
+          <tr><td>MAX_PLACEMENTS_PER_RUN</td><td>3</td></tr>
+          <tr><td bgcolor="#3a0a3a"><font color="#ffccff">MIN_CONVICTION</font></td><td bgcolor="#3a0a3a"><font color="#ffccff">0.15</font></td></tr>
+          <tr><td bgcolor="#3a0a3a"><font color="#ffccff">MAX_EXPIRY_EXPOSURE_PCT</font></td><td bgcolor="#3a0a3a"><font color="#ffccff">0.50</font></td></tr>
+          <tr><td bgcolor="#3a0a3a"><font color="#ffccff">REGIME_RSI_LOW/HIGH/SCALE</font></td><td bgcolor="#3a0a3a"><font color="#ffccff">20 / 80 / 0.5</font></td></tr>
+          <tr><td bgcolor="#3a0a3a"><font color="#ffccff">NET_RECONCILIATION</font></td><td bgcolor="#3a0a3a"><font color="#ffccff">1</font></td></tr>
+        </table>>];
+
+    svc -> vars [style=dotted, arrowhead=none, color="#aaff66"];
+}

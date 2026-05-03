@@ -1,0 +1,73 @@
+// 21 — Consecutive-loss circuit breaker: tick-by-tick state machine
+digraph streak_flow {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    start [label="systemd tick fires\nload streak.json", fillcolor="#0a3a0a", color="#39ff14", shape=oval, penwidth=3];
+
+    // Cooldown check
+    cool_check [label="cooldown_until set\nAND now < cooldown_until?",
+                shape=diamond, fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+    cool_block [label="[STOP] Streak cooldown\nN consecutive losses (bias: X)\nresuming in M min",
+                fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+    cool_expired [label="cooldown expired\nreset: consecutive_losses=0\nhad_positions=false",
+                  fillcolor="#0a3a0a", color="#39ff14"];
+
+    // Settlement detection
+    settle_check [label="had_positions = true\nAND open_cost ≈ 0?",
+                  shape=diamond, fillcolor="#1a2a1a", color="#39ff14"];
+    no_settle [label="no settlement detected\n(still deployed, or was flat)", fillcolor="#1a2a1a", color="#39ff14"];
+
+    // PnL computation
+    pnl_calc [label="settlement detected!\npnl = portfolio_now\n    − last_portfolio_with_positions",
+              fillcolor="#1a2a1a", color="#39ff14"];
+    pnl_check [label="pnl < −$0.50?", shape=diamond, fillcolor="#1a2a1a", color="#39ff14"];
+
+    // Loss path
+    inc_loss [label="consecutive_losses++\nlast_loss_side = dominant_side(last 20 trades)\n≥70% same side → 'YES' or 'NO'",
+              fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+    halt_check [label="consecutive_losses\n≥ CONSEC_LOSS_HALT (2)?",
+                shape=diamond, fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+    set_cooldown [label="cooldown_until =\nnow + BIAS_COOLDOWN_MINS (60 min)\nsave streak.json\n→ HALT this tick",
+                  fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999"];
+
+    // Win path
+    reset_streak [label="consecutive_losses = 0\nlast_loss_side = null\n(win resets the counter)",
+                  fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa"];
+
+    // State update
+    update [label="if open_cost > 0:\n  last_portfolio_with_positions = portfolio\n  had_positions = true\nsave streak.json",
+            fillcolor="#1a2a1a", color="#39ff14"];
+    proceed [label="→ continue to trading logic\n(drawdown, daily cap, classifier, gates…)",
+             fillcolor="#0a3a0a", color="#39ff14", shape=oval, penwidth=3];
+
+    // Wiring
+    start -> cool_check;
+    cool_check -> cool_block [label="yes (in cooldown)", color="#ff3333"];
+    cool_check -> cool_expired [label="yes (expired)", color="#aaff66"];
+    cool_check -> settle_check [label="no"];
+    cool_expired -> settle_check;
+
+    settle_check -> no_settle [label="no"];
+    settle_check -> pnl_calc [label="yes"];
+    no_settle -> update;
+    pnl_calc -> pnl_check;
+
+    pnl_check -> inc_loss [label="loss", color="#ff3333"];
+    pnl_check -> reset_streak [label="win/flat", color="#aaff66"];
+    reset_streak -> update;
+
+    inc_loss -> halt_check;
+    halt_check -> set_cooldown [label="yes (≥2)", color="#ff3333"];
+    halt_check -> update [label="no (streak=1,\nkeep trading)"];
+
+    update -> proceed;
+
+    // Annotation: what this prevents
+    prevents [label="What this catches —\n2026-04-15 evening:\n  20:00 all-NO → loss → streak=1\n  22:00 all-NO → loss → streak=2 → HALT\n\nWithout breaker: 22:00 loss = −$13.23\nWith breaker: 60-min cooldown after 20:00\n→ 22:00 trades never placed",
+              shape=note, fillcolor="#2a1a0a", color="#ffcc66", fontcolor="#ffcc66"];
+    set_cooldown -> prevents [style=dotted, arrowhead=none, color="#ffcc66"];
+}

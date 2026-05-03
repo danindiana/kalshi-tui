@@ -1,0 +1,55 @@
+[Unit]
+Description=Kalshi BTC Auto-Trader (classifier-based order placement)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jeb
+Group=jeb
+WorkingDirectory=/home/jeb/programs/gemini_trader
+ExecStart=/home/jeb/programs/gemini_trader/venv/bin/python /home/jeb/programs/gemini_trader/auto_trader.py
+StandardOutput=append:/home/jeb/.local/share/kalshi-tui/auto_trader.log
+StandardError=append:/home/jeb/.local/share/kalshi-tui/auto_trader.log
+TimeoutStartSec=120
+
+# ── Bankroll cap (only applies once account > $500) ───────────────────────────
+Environment="MAX_BANKROLL=500"
+
+# ── Proportional limits (scale with live balance — the ratchet) ───────────────
+Environment="DAILY_LOSS_PCT=100.0"
+Environment="MAX_STAKE_PCT=0.12"
+Environment="MAX_RUN_PCT=0.40"
+
+# ── Absolute ceilings (proportional limits can't exceed these) ────────────────
+Environment="DAILY_LOSS_LIMIT=10000"
+Environment="MAX_STAKE_DOLLARS=25"
+Environment="MAX_RUN_DOLLARS=100"
+
+# ── Stop-loss ─────────────────────────────────────────────────────────────────
+Environment="MIN_BALANCE=5.00"
+Environment="DRAWDOWN_HALT=0.50"
+
+# ── Edge / Kelly ──────────────────────────────────────────────────────────────
+Environment="MIN_EDGE=0.05"
+Environment="FRACTIONAL_KELLY=0.33"
+
+
+# ── Safety gates ──────────────────────────────────────────────────────────────
+Environment="MAX_PRED_DEV_PCT=3.0"
+Environment="MAE_MAX_DOLLARS=2000"
+Environment="MIN_CONTRACT_CENTS=10"
+Environment="MAX_CONTRACT_CENTS=95"
+Environment="MAX_SETTLEMENT_WINDOW_MINUTES=90"
+Environment="MAX_PROB_RATIO=3.0"
+
+# ── Mode ──────────────────────────────────────────────────────────────────────
+Environment="DRY_RUN=0"
+
+# ── Runtime paths ─────────────────────────────────────────────────────────────
+Environment="LD_LIBRARY_PATH=/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib:/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cusparse/lib:/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cusolver/lib:/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/nvjitlink/lib:/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/curand/lib:/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cufft/lib:/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cublas/lib:/usr/lib/ollama"
+Environment="XLA_FLAGS=--xla_gpu_cuda_data_dir=/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cuda_nvcc"
+Environment="PATH=/home/jeb/programs/gemini_trader/venv/lib/python3.12/site-packages/nvidia/cuda_nvcc/bin:/home/jeb/programs/gemini_trader/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+[Install]
+WantedBy=multi-user.target

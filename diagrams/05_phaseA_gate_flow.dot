@@ -1,0 +1,60 @@
+// 05 — Phase A gate flow — ordered checks inside find_opportunities + placement loop
+// Magenta = new gates this session; green = pre-existing
+digraph phaseA_gate_flow {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    candle   [label="strike candidate\n(for each market)", fillcolor="#0a3a0a", color="#39ff14", penwidth=3, shape=oval];
+    clf      [label="classifier P(price > strike)\n→ clf_prob, side, model_prob", fillcolor="#1a2a1a", color="#39ff14"];
+    edge_g   [label="edge = model_prob − market_price\nedge ≥ 5%?", fillcolor="#1a2a1a", color="#39ff14", shape=diamond];
+    conv     [label="★ conviction = |clf_prob − 0.5|\nconviction ≥ 0.15?", fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3, shape=diamond];
+    price_g  [label="order_price in [10¢, 95¢)?\n(uses actual side-price)", fillcolor="#1a2a1a", color="#39ff14", shape=diamond];
+    ratio_g  [label="model_prob / market_price ≤ 3×?", fillcolor="#1a2a1a", color="#39ff14", shape=diamond];
+    kelly    [label="Kelly stake\nstake_pct = K(p, price, 0.33)", fillcolor="#1a2a1a", color="#39ff14"];
+    regime   [label="★ RSI < 20 or > 80?\nthen stake_pct ×= 0.5", fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3, shape=diamond];
+    opp      [label="emit opportunity\n{ticker, side, edge, stake_pct,\nconviction, regime_extreme}", fillcolor="#1a2a1a", color="#39ff14"];
+
+    sort     [label="sort all opps by edge ↓", fillcolor="#1a2a1a", color="#39ff14"];
+
+    recon    [label="★ net reconciliation\nholding opposing side?", fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3, shape=diamond];
+    override [label="conviction ≥ 0.30?", fillcolor="#3a0a3a", color="#ff66ff", shape=diamond];
+    cap_n    [label="top-N cap\nkeep top 3 by edge", fillcolor="#1a3a1a", color="#aaff66"];
+
+    place_loop [label="placement loop\n(per surviving opp)", fillcolor="#1a2a1a", color="#39ff14"];
+    budget_g [label="run/daily budget left?", fillcolor="#1a2a1a", color="#39ff14", shape=diamond];
+    expiry_g [label="★ expiry cost + this cost ≤\n50% of portfolio?", fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3, shape=diamond];
+    place    [label="POST /portfolio/orders\nlog trade to SQLite", fillcolor="#0a3a0a", color="#39ff14", penwidth=3];
+
+    skip  [label="[SKIP]", fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+
+    // Opportunity-finding path
+    candle -> clf -> edge_g;
+    edge_g -> skip [label="no",  color="#ff3333"];
+    edge_g -> conv [label="yes"];
+    conv -> skip [label="no",   color="#ff3333"];
+    conv -> price_g [label="yes"];
+    price_g -> skip [label="no", color="#ff3333"];
+    price_g -> ratio_g [label="yes"];
+    ratio_g -> skip [label="no", color="#ff3333"];
+    ratio_g -> kelly [label="yes"];
+    kelly -> regime -> opp;
+
+    // Aggregation + placement path
+    opp -> sort -> recon;
+    recon -> cap_n [label="no (not opposing)"];
+    recon -> override [label="yes (opposing)"];
+    override -> cap_n [label="yes — [NET]", color="#ff66ff"];
+    override -> skip  [label="no — [SKIP-OPP]", color="#ff3333"];
+    cap_n -> place_loop;
+    place_loop -> budget_g;
+    budget_g -> skip [label="no", color="#ff3333"];
+    budget_g -> expiry_g [label="yes"];
+    expiry_g -> skip [label="no", color="#ff3333"];
+    expiry_g -> place [label="yes"];
+
+    { rank=same; edge_g; conv; price_g; ratio_g }
+    { rank=same; budget_g; expiry_g }
+}

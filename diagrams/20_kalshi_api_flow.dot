@@ -1,0 +1,86 @@
+// 20 — Kalshi API interaction: request/response flow per tick
+digraph kalshi_api {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // auto_trader.py
+    subgraph cluster_trader {
+        label="auto_trader.py (per tick)";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        auth [label="KalshiSigner.from_config()\nRSA-PSS / SHA-256\nmessage = ts_ms + METHOD + path",
+              fillcolor="#0a2a0a", color="#39ff14"];
+
+        r1 [label="① GET /portfolio/balance\n→ cash in cents", fillcolor="#1a2a1a", color="#39ff14"];
+        r2 [label="② GET /portfolio/positions\n→ event_positions[].total_cost_dollars\n→ market_positions[].position",
+            fillcolor="#1a2a1a", color="#39ff14"];
+        r3 [label="③ GET /events (filtered)\n→ settlement close_time\n→ find next window",
+            fillcolor="#1a2a1a", color="#39ff14"];
+        r4 [label="④ GET /markets?event_ticker=X\n→ per-strike yes_price, no_price",
+            fillcolor="#1a2a1a", color="#39ff14"];
+        r5 [label="⑤ POST /portfolio/orders\n(per surviving opportunity)\n→ order_id or 400 error",
+            fillcolor="#1a2a1a", color="#39ff14"];
+    }
+
+    // Kalshi API
+    subgraph cluster_kalshi {
+        label="Kalshi REST API\nhttps://api.elections.kalshi.com/trade-api/v2";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff66ff"; penwidth=2;
+
+        api_bal  [label="/portfolio/balance\n→ {balance: cents}", fillcolor="#2a0a2a", color="#ff66ff"];
+        api_pos  [label="/portfolio/positions\n→ {event_positions, market_positions}",
+                  fillcolor="#2a0a2a", color="#ff66ff"];
+        api_evt  [label="/events?series_ticker=KXBTCD\n→ [{event_ticker, close_time}]",
+                  fillcolor="#2a0a2a", color="#ff66ff"];
+        api_mkt  [label="/markets?event_ticker=X\n→ [{ticker, strike, yes_price, no_price}]",
+                  fillcolor="#2a0a2a", color="#ff66ff"];
+        api_ord  [label="/portfolio/orders\n← {ticker, side, count, yes/no_price, type}\n→ {order: {order_id}}",
+                  fillcolor="#2a0a2a", color="#ff66ff"];
+    }
+
+    // Gemini (data source, separate)
+    subgraph cluster_gemini {
+        label="Gemini WS (data only)";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#66ffff"; penwidth=2;
+
+        gem [label="1-min BTC candles\n(1440 bars via live_candles.py)",
+             fillcolor="#0a2a2a", color="#66ffff"];
+    }
+
+    // Usage in pipeline
+    subgraph cluster_usage {
+        label="What each call is used for";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+
+        u1 [label="① balance → bankroll sizing\n   → Kelly denominators\n   → daily cap check", fillcolor="#2a1a0a", color="#ffcc66"];
+        u2 [label="② positions →\n   • portfolio_value (cash + cost basis)\n   • drawdown calc → halt gate\n   • reconciliation (block opposing)\n   • expiry cap (existing $ per settlement)",
+            fillcolor="#2a1a0a", color="#ffcc66"];
+        u3 [label="③ events → settlement window\n   (10 min cutoff before close)", fillcolor="#2a1a0a", color="#ffcc66"];
+        u4 [label="④ markets → strike prices\n   → classifier per-strike input\n   → edge calculation", fillcolor="#2a1a0a", color="#ffcc66"];
+        u5 [label="⑤ orders → actual trade execution\n   → order_id for tracking\n   → 400 on at-limit contracts (filtered)", fillcolor="#2a1a0a", color="#ffcc66"];
+    }
+
+    // Wiring
+    auth -> r1 [label="signed"];
+    r1 -> api_bal;
+    r2 -> api_pos;
+    r3 -> api_evt;
+    r4 -> api_mkt;
+    r5 -> api_ord;
+
+    r1 -> u1 [style=dashed, color="#ffaa00"];
+    r2 -> u2 [style=dashed, color="#ffaa00"];
+    r3 -> u3 [style=dashed, color="#ffaa00"];
+    r4 -> u4 [style=dashed, color="#ffaa00"];
+    r5 -> u5 [style=dashed, color="#ffaa00"];
+
+    gem -> r4 [label="candles feed\nclassifier separately", style=dashed, color="#66ffff"];
+
+    // Auth detail
+    auth_detail [label="RSA-PSS auth detail:\n• key_id from ~/.kalshi/credentials\n• sign(ts_ms + METHOD + path)\n  with SHA-256/MGF1/salt=32\n• headers: KALSHI-ACCESS-KEY,\n  KALSHI-ACCESS-SIGNATURE,\n  KALSHI-ACCESS-TIMESTAMP",
+                 shape=note, fillcolor="#2a1a0a", color="#ffcc66", fontcolor="#ffcc66"];
+    auth -> auth_detail [style=dotted, arrowhead=none, color="#ffcc66"];
+}

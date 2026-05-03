@@ -1,0 +1,63 @@
+// 15 — Ensemble bucket routing: how mins_to_expiry → model → prediction
+digraph ensemble_routing {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    input [label="strike candidate\n(base_feats, dist, mins)", fillcolor="#0a3a0a", color="#39ff14", shape=oval, penwidth=3];
+
+    router [label="bucket_for(mins)\nmins → bucket index", fillcolor="#1a2a1a", color="#39ff14", shape=diamond];
+
+    subgraph cluster_models {
+        label="Trained models (GPU/CPU)";
+        style="rounded,filled"; color="#ff66ff"; fillcolor="#1a0a1a"; fontcolor="#ff66ff"; penwidth=2;
+
+        early [label="classifier_early.pkl\nhorizons [10, 25) min\n\n2.7M train samples\nWR 68.4%  EV +0.094\nbest_iter 277",
+               fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff"];
+        mid   [label="classifier_mid.pkl\nhorizons [25, 50) min\n\n3.6M train samples\nWR 71.3%  EV +0.096\nbest_iter 267",
+               fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+        late  [label="classifier_late.pkl\nhorizons [50, 90] min\n\n4.4M train samples\nWR 67.9%  EV +0.086\nbest_iter 288",
+               fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff"];
+    }
+
+    prob [label="clf_prob\n= P(BTC > strike at settle)", fillcolor="#0a3a0a", color="#39ff14", shape=oval, penwidth=3];
+
+    // Vote modes
+    subgraph cluster_vote {
+        label="Vote modes (env-selectable)";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#66ffff"; penwidth=2;
+
+        vb [label="vote='bucket' (default)\nroute to owning model only\n→ specialist prediction",
+            fillcolor="#0a2a2a", color="#66ffff"];
+        va [label="vote='avg'\navg across all 3 models\n→ ensemble-smoothed prediction",
+            fillcolor="#0a2a2a", color="#66ffff"];
+    }
+
+    input -> router;
+    router -> early [label="12 min", color="#aaff66"];
+    router -> mid   [label="35 min", color="#ff66ff"];
+    router -> late  [label="70 min", color="#ffaa00"];
+
+    early -> vb;
+    mid   -> vb;
+    late  -> vb;
+    early -> va [style=dashed, color="#66ffff"];
+    mid   -> va [style=dashed, color="#66ffff"];
+    late  -> va [style=dashed, color="#66ffff"];
+
+    vb -> prob;
+    va -> prob [style=dashed, color="#66ffff"];
+
+    // Fallback
+    fallback [label="classifier_model.pkl\n(unified, all horizons)\nloaded if NO bucket pkls exist",
+              fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+    router -> fallback [label="fallback\n(bucket pkls missing)", style=dashed, color="#ffaa00"];
+    fallback -> prob [style=dashed, color="#ffaa00"];
+
+    // Perf note
+    perf [label="Mid bucket is the standout:\n71.3% WR vs 68.3% unified\n(+3pp from horizon specialization)\n\nLonger horizons = noisier;\nlate bucket trained on 5 horizons\nbut still shows 67.9% — on par",
+          shape=note, fillcolor="#2a1a0a", color="#ffcc66", fontcolor="#ffcc66"];
+    mid -> perf [style=dotted, arrowhead=none, color="#ffcc66"];
+}

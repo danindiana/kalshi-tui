@@ -1,0 +1,71 @@
+// 03 — Status tab layout (vertical, 5 rows)
+// Renders the actual frame split in ui.rs::draw_status.
+digraph status_tab_layout {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6",
+          style="filled,rounded", shape=box, fillcolor="#1a1f2e", penwidth=2, color="#39ff14"];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=9, penwidth=1.2];
+
+    frame [label="Status tab (full area)",
+           fillcolor="#0a1a0a", color="#39ff14", fontcolor="#39ff14",
+           shape=box, style="rounded,filled", penwidth=3, fontsize=14];
+
+    // Row 1 (height 9): services | trading stats
+    subgraph cluster_r1 {
+        label="rows[0]  Length=9"; fontcolor="#00ffff"; color="#00ffff";
+        style="rounded,filled"; fillcolor="#0a1a1a"; penwidth=2;
+        svc  [label="Services (45%)\ntimer ● / ○\nauto-trader svc\norderbook svc", color="#66ffff", fillcolor="#1a2a2a"];
+        tstat[label="Trading Stats (55%)\nbalance / HWM / drawdown\ndaily budget\nlast run result", color="#66ffff", fillcolor="#1a2a2a"];
+    }
+
+    // Row 2 (height 9): NEW — perf by side | size x side bucket
+    subgraph cluster_r2 {
+        label="rows[1]  Length=9   (NEW 2026-04-16)"; fontcolor="#39ff14"; color="#39ff14";
+        style="rounded,filled"; fillcolor="#0a1a0a"; penwidth=3;
+        perf_side [label="Performance by Side (45%)\nN · Win% · Cost(W) · Cost(L) · NetPnL\nyellow 'loss+NN%' skew tag",
+                   color="#aaff66", fillcolor="#1a3a1a", penwidth=2];
+        perf_bkt  [label="Size × Side (55%, worst first)\nsmall / mid / large × YES / NO\n⚠ LEAK flag for large-negative buckets",
+                   color="#aaff66", fillcolor="#1a3a1a", penwidth=2];
+    }
+
+    // Row 3 (height 10): recent runs table
+    subgraph cluster_r3 {
+        label="rows[2]  Length=10"; fontcolor="#ffaa00"; color="#ffaa00";
+        style="rounded,filled"; fillcolor="#1a1408"; penwidth=2;
+        runs [label="Recent Runs (last 8)\ntime · price · model · placed · staked",
+              color="#ffcc66", fillcolor="#2a1a0a"];
+    }
+
+    // Row 4 (height 10): recent trades table
+    subgraph cluster_r4 {
+        label="rows[3]  Length=10"; fontcolor="#ffaa00"; color="#ffaa00";
+        style="rounded,filled"; fillcolor="#1a1408"; penwidth=2;
+        trades [label="Recent Trades (last 12)\ntime · strike · side · qty · price · cost · edge · status",
+                color="#ffcc66", fillcolor="#2a1a0a"];
+    }
+
+    // Row 5 (min 5): log tail
+    subgraph cluster_r5 {
+        label="rows[4]  Min=5"; fontcolor="#ff00ff"; color="#ff00ff";
+        style="rounded,filled"; fillcolor="#1a0a1a"; penwidth=2;
+        logtail [label="Log tail (auto_trader.log)\ncolor-coded:  [OK] green  [SKIP] yellow  [ERR] red",
+                 color="#ff66ff", fillcolor="#2a1a2a"];
+    }
+
+    frame -> svc;
+    frame -> tstat;
+    frame -> perf_side;
+    frame -> perf_bkt;
+    frame -> runs;
+    frame -> trades;
+    frame -> logtail;
+
+    // Draw the row ordering with invisible edges for readability
+    svc   -> perf_side [style=invis];
+    tstat -> perf_bkt  [style=invis];
+    perf_side -> runs  [style=invis];
+    runs -> trades     [style=invis];
+    trades -> logtail  [style=invis];
+}

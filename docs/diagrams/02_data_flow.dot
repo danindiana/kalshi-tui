@@ -1,0 +1,68 @@
+// 02 — Data flow: sources -> transforms -> TUI tabs
+// One box per distinct data stream. Dotted edges are pull; solid are push.
+digraph kalshi_tui_dataflow {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", color="#39ff14",
+          style="filled,rounded", shape=box, fillcolor="#1a1f2e", penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // ── Sources ────────────────────────────────────────────────────
+    subgraph cluster_sources {
+        label="Sources";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff00ff"; penwidth=2;
+        kmarkets   [label="Kalshi /markets\n(public, unauthed)", shape=cloud, fillcolor="#2a1a2a", color="#ff66ff"];
+        kport      [label="Kalshi /portfolio/*\n(RSA-PSS signed)", shape=cloud, fillcolor="#2a1a2a", color="#ff66ff"];
+        pyclf      [label="predict_classifier_json.py\nsubprocess\nprob / edge / Kelly per strike", shape=note, fillcolor="#2a1a2a", color="#ff66ff"];
+        systemd    [label="systemctl show\ntimer + service + orderbook", shape=note, fillcolor="#2a1a2a", color="#ff66ff"];
+        atdb       [label="auto_trader.db\nruns + trades\n+ settlements_raw\n+ trade_outcomes view", shape=cylinder, fillcolor="#2a1a2a", color="#ff66ff"];
+        atlog      [label="auto_trader.log\ntail N lines", shape=note, fillcolor="#2a1a2a", color="#ff66ff"];
+        preddb     [label="predictions.db\nTUI-local", shape=cylinder, fillcolor="#2a1a2a", color="#ff66ff"];
+    }
+
+    // ── Transforms ─────────────────────────────────────────────────
+    subgraph cluster_transform {
+        label="Transforms (Rust)";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#00ffff"; penwidth=2;
+        fetch   [label="fetcher_loop\npoll every 30s", fillcolor="#1a2a2a", color="#66ffff"];
+        poll    [label="poll_model\nsubprocess + parse", fillcolor="#1a2a2a", color="#66ffff"];
+        status  [label="sysinfo::collect\nsystemd + SQL + tail", fillcolor="#1a2a2a", color="#66ffff"];
+        perf    [label="load_outcomes\naggregate by side / size bucket", fillcolor="#1a2a2a", color="#66ffff"];
+        consens [label="consensus signal\nmodel vs market", fillcolor="#1a2a2a", color="#66ffff"];
+    }
+
+    // ── Tabs ───────────────────────────────────────────────────────
+    subgraph cluster_tabs {
+        label="TUI tabs";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffaa00"; penwidth=2;
+        markets  [label="1 · Markets\nstrike ladder\n+ dashboard header", fillcolor="#2a1a0a", color="#ffcc66"];
+        preds    [label="2 · Predictions\nmanual targets\nw/l scoring"];
+        analysis [label="3 · Analysis\nedge bar chart\nKelly %"];
+        portf    [label="4 · Portfolio\nbalance / positions / orders"];
+        stat     [label="5 · Status\nservices + perf\n+ runs + trades + log", fillcolor="#3a2a0a", color="#ffdd66"];
+    }
+
+    // ── Sources -> Transforms ──────────────────────────────────────
+    kmarkets -> fetch    [color="#ff00ff"];
+    kport    -> fetch    [color="#ff00ff"];
+    pyclf    -> poll     [color="#ff00ff"];
+    systemd  -> status;
+    atdb     -> status;
+    atdb     -> perf;
+    atlog    -> status;
+    preddb   -> preds    [style=dashed, label="rusqlite"];
+
+    fetch -> consens [style=dashed];
+    poll  -> consens [style=dashed];
+
+    // ── Transforms -> Tabs ─────────────────────────────────────────
+    fetch   -> markets;
+    fetch   -> portf;
+    poll    -> markets  [label="header"];
+    poll    -> analysis [label="opps"];
+    consens -> markets  [label="banner", color="#00ffff"];
+
+    status -> stat;
+    perf   -> stat [color="#39ff14", label="new panels", penwidth=2];
+}

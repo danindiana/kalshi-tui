@@ -1,0 +1,85 @@
+// 01 — System architecture: where everything lives on disk and how the pieces wire together
+digraph kalshi_system {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", color="#39ff14",
+          style="filled,rounded", shape=box, fillcolor="#1a1f2e", penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // ── External data sources ──────────────────────────────────────
+    subgraph cluster_external {
+        label="External APIs";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff00ff"; penwidth=2;
+        gemini   [label="Gemini WS\n1m BTC candles", fillcolor="#2a1a2a", color="#ff66ff"];
+        kalshi   [label="Kalshi REST\n/markets /portfolio /orders\n(RSA-PSS auth)", fillcolor="#2a1a2a", color="#ff66ff"];
+    }
+
+    // ── systemd ────────────────────────────────────────────────────
+    subgraph cluster_systemd {
+        label="systemd (cron of last resort)";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#00ffff"; penwidth=2;
+        timer    [label="kalshi-auto-trader.timer\n*/10 min", fillcolor="#1a2a2a", color="#66ffff"];
+        svc      [label="kalshi-auto-trader.service\n(oneshot)", fillcolor="#1a2a2a", color="#66ffff"];
+        ob_svc   [label="orderbook-collector.service\nL2 snapshots / 60s", fillcolor="#1a2a2a", color="#66ffff"];
+        timer -> svc [label="fires"];
+    }
+
+    // ── Live python pipeline ──────────────────────────────────────
+    subgraph cluster_python {
+        label="Python pipeline — ~/programs/gemini_trader/  (12 GB)";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#39ff14"; penwidth=2;
+        candles  [label="live_candles.py\n1440 1m bars"];
+        clf_dev  [label="classifier_device.py\nCPU fallback if GPU busy"];
+        auto     [label="auto_trader.py\nMAIN ENTRY", fillcolor="#1a3a1a", color="#aaff66"];
+        auth     [label="kalshi_auth.py\nRSA-PSS signer"];
+        risk     [label="risk_manager.py\nKelly sizing"];
+        clf_pkl  [label="time_series/\nclassifier_model.pkl\nXGBoost GBT", shape=cylinder, fillcolor="#2a1a0a", color="#ffaa00"];
+        ob_coll  [label="orderbook_collector.py"];
+        invest   [label="investigate_recent.py\ncalibration check"];
+        bt       [label="backtest_gates.py"];
+    }
+
+    // ── State / IO ─────────────────────────────────────────────────
+    subgraph cluster_state {
+        label="Runtime state — ~/.local/share/kalshi-tui/";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffaa00"; penwidth=2;
+        db       [label="auto_trader.db\nruns + trades", shape=cylinder, fillcolor="#2a1a0a", color="#ffcc66"];
+        log      [label="auto_trader.log\nappend-only", shape=note, fillcolor="#2a1a0a", color="#ffcc66"];
+        hwm      [label="hwm.json\nHWM + drawdown", shape=note, fillcolor="#2a1a0a", color="#ffcc66"];
+        ob_db    [label="orderbook.db", shape=cylinder, fillcolor="#2a1a0a", color="#ffcc66"];
+    }
+
+    // ── TUI ────────────────────────────────────────────────────────
+    subgraph cluster_tui {
+        label="Operator UI — claude_creations/2026-04-12_161843_kalshi-tui/";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#39ff14"; penwidth=2;
+        tui      [label="kalshi-tui (Rust/Ratatui)\n5 tabs incl. System", fillcolor="#1a3a1a"];
+        wizard   [label="wizard.py\nguided CLI"];
+    }
+
+    // ── Wiring ────────────────────────────────────────────────────
+    svc -> auto;
+    ob_svc -> ob_coll;
+
+    candles -> auto;
+    auth    -> auto [style=dashed];
+    risk    -> auto [style=dashed];
+    clf_dev -> auto [style=dashed];
+    clf_pkl -> auto;
+
+    auto -> kalshi  [label="GET /markets\nGET /portfolio/balance\nGET /portfolio/positions\nPOST /portfolio/orders", color="#ff00ff"];
+    gemini -> candles [color="#ff00ff"];
+    auto -> db;
+    auto -> log;
+    auto -> hwm;
+    ob_coll -> ob_db;
+    kalshi -> ob_coll [color="#ff00ff", style=dashed];
+
+    db -> tui;
+    log -> tui;
+    hwm -> tui;
+    db -> invest;
+    db -> wizard;
+    invest -> bt [style=dashed, label="EV/WR check"];
+}

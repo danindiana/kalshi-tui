@@ -1,0 +1,79 @@
+// 10 — Python module dependency graph for ~/programs/gemini_trader/
+digraph module_deps {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=9, penwidth=1.3];
+
+    // ── Entrypoints ──────────────────────────────────────────────
+    subgraph cluster_entry {
+        label="Entrypoints (systemd or CLI)";
+        style="rounded,filled"; color="#ff00ff"; fillcolor="#1a0a1a"; fontcolor="#ff66ff"; penwidth=2;
+        auto   [label="auto_trader.py\n⚡ systemd timer", fillcolor="#3a0a3a", color="#ff66ff", penwidth=3];
+        ob_c   [label="orderbook_collector.py\n⚡ systemd service", fillcolor="#3a0a3a", color="#ff66ff"];
+        pred   [label="predict_classifier_json.py\n• wizard / TUI", fillcolor="#3a0a3a", color="#ff66ff"];
+        wiz    [label="wizard.py\n• operator CLI", fillcolor="#3a0a3a", color="#ff66ff"];
+        invest [label="investigate_recent.py\n• calibration audit", fillcolor="#3a0a3a", color="#ff66ff"];
+        bt     [label="backtest_gates.py\n• model gate test", fillcolor="#3a0a3a", color="#ff66ff"];
+    }
+
+    // ── Runtime support ─────────────────────────────────────────
+    subgraph cluster_rt {
+        label="Runtime support";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+        auth   [label="kalshi_auth.py\nRSA-PSS signer",       fillcolor="#0a2a0a", color="#39ff14"];
+        cli    [label="kalshi_client.py\nHTTP wrappers",      fillcolor="#0a2a0a", color="#39ff14"];
+        cand   [label="live_candles.py\nGemini WS → candles", fillcolor="#0a2a0a", color="#39ff14"];
+        risk   [label="risk_manager.py\nKelly criterion",     fillcolor="#0a2a0a", color="#39ff14"];
+        cdev   [label="classifier_device.py\nGPU/CPU probe",  fillcolor="#0a2a0a", color="#39ff14"];
+        tlog   [label="trader_log.py\nlog fmt helpers",       fillcolor="#0a2a0a", color="#39ff14"];
+    }
+
+    // ── Phase B scaffolds (NEW, unwired) ────────────────────────
+    subgraph cluster_pb {
+        label="Phase B scaffolds (not yet imported by auto_trader)";
+        style="rounded,filled"; color="#ff66ff"; fillcolor="#1a0a1a"; fontcolor="#ff66ff"; penwidth=2;
+        obf  [label="orderbook_features.py\n5 microstructure feats", fillcolor="#2a0a2a", color="#ff66ff"];
+        ens  [label="classifier_ensemble.py\nhorizon-bucket voter",  fillcolor="#2a0a2a", color="#ff66ff"];
+    }
+
+    // ── Training ─────────────────────────────────────────────────
+    subgraph cluster_train {
+        label="time_series/ (training)";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+        tc   [label="train_classifier.py\nXGBoost GBT + isotonic", fillcolor="#2a1a0a", color="#ffaa00"];
+        pkl  [label="classifier_model.pkl\n+ training_metrics.json", shape=cylinder, fillcolor="#2a1a0a", color="#ffaa00"];
+    }
+
+    // ── Wiring ──────────────────────────────────────────────────
+    auto -> cand;
+    auto -> auth;
+    auto -> risk;
+    auto -> cdev;
+    auto -> tc [label="CalibratedXGB\nunpickle", style=dashed];
+    auto -> pkl [label="loads"];
+
+    pred -> auth;
+    pred -> cdev;
+    pred -> cand;
+    pred -> pkl;
+    pred -> tc [style=dashed];
+
+    invest -> pkl;
+    invest -> cdev;
+    bt     -> pkl;
+
+    ob_c -> auth;
+    ob_c -> cli;
+
+    wiz -> pred [label="subprocess"];
+    wiz -> auto [label="subprocess"];
+
+    // Phase B edges (dashed, magenta)
+    ens -> pkl  [label="fallback", style=dashed, color="#ff66ff"];
+    ens -> cdev [label="CPU probe", style=dashed, color="#ff66ff"];
+
+    // training output
+    tc -> pkl;
+}

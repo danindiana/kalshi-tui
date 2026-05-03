@@ -1,0 +1,59 @@
+// 13 — Lifecycle of a single trade from signal to settlement P&L
+digraph lifecycle {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // ── T-N: data ────────────────────────────────────────────────
+    t0 [label="T − 90 min\ndata collection\n(Gemini WS continuous)",
+        fillcolor="#0a2a2a", color="#66ffff", shape=oval];
+    t1 [label="T − 90 min\nsettlement market listed\non Kalshi", fillcolor="#2a0a2a", color="#ff66ff", shape=oval];
+
+    // ── T-10: decision ───────────────────────────────────────────
+    t2 [label="T − 10 min (or earlier)\nsystemd timer fires\nauto_trader.py runs", fillcolor="#1a2a1a", color="#39ff14"];
+    t3 [label="• fetch candles & OB\n• classifier P(y>strike)\n• edge & conviction gates", fillcolor="#1a2a1a", color="#39ff14"];
+    t4 [label="• Kelly size\n• regime scale if RSI-extreme\n• reconcile positions\n• top-N cap\n• expiry cap", fillcolor="#1a2a1a", color="#39ff14"];
+
+    // ── Order submitted ─────────────────────────────────────────
+    t5 [label="POST /portfolio/orders\n(RSA-PSS signed)", fillcolor="#1a2a1a", color="#39ff14"];
+    t6 [label="order filled\n(usually instant at limit price)", fillcolor="#1a2a1a", color="#39ff14"];
+
+    // ── Persistence ─────────────────────────────────────────────
+    t7 [label="auto_trader.db\nINSERT trades\nINSERT runs", shape=cylinder, fillcolor="#2a1a0a", color="#ffaa00"];
+    t8 [label="hwm.json\nupdate portfolio_value", shape=note, fillcolor="#2a1a0a", color="#ffaa00"];
+
+    // ── T: settlement ───────────────────────────────────────────
+    t9 [label="T (settlement tick)\nKalshi reads BTC index price\n→ contracts resolve to $0 or $1",
+        fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+
+    // ── T+ε: P&L realized ───────────────────────────────────────
+    win  [label="WIN  → cash += contracts × $1.00",
+          fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", shape=oval];
+    lose [label="LOSE → cash += $0.00",
+          fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+
+    // ── T+1min: next run ────────────────────────────────────────
+    t10 [label="next tick (T + ε)\nbalance API reflects settled P&L\nHWM + drawdown update", fillcolor="#1a2a1a", color="#39ff14"];
+    t11 [label="feedback into sizing:\nshrunk bankroll\n→ smaller next stakes", fillcolor="#1a2a1a", color="#39ff14"];
+
+    // Wiring
+    t0 -> t3 [label="6 feats"];
+    t1 -> t2;
+    t2 -> t3 -> t4 -> t5 -> t6 -> t7 -> t8;
+    t8 -> t9 [label="wait\nup to 90 min"];
+    t9 -> win  [label="P(WR)=65%"];
+    t9 -> lose [label="P(1-WR)=35%"];
+    win  -> t10;
+    lose -> t10;
+    t10 -> t11;
+
+    // Back-edge: bankroll feedback
+    t11 -> t4 [label="next-run sizing", color="#aaff66", style=dashed];
+
+    // Call-out on EV math
+    ev [label="Expected value per trade:\nEV = WR × (1 − price) − (1 − WR) × price\ne.g. WR=0.68, price=$0.60\n→ EV = +$0.26/contract\n(average long-run, not per trade)",
+        shape=note, fillcolor="#2a1a0a", color="#ffcc66", fontcolor="#ffcc66"];
+    t9 -> ev [style=dotted, arrowhead=none, color="#ffcc66"];
+}

@@ -1,0 +1,46 @@
+// 17 — 2026-04-15 04:00 incident anatomy: timeline of the catastrophic settlement
+digraph incident {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // Timeline nodes (top-down = chronological)
+    t0 [label="02:10 CDT\nBTC = $73,894  RSI 30.6\nClassifier: YES on low strikes\n(momentum −33.9, oversold bounce)", fillcolor="#0a2a2a", color="#66ffff"];
+    t1 [label="02:20 CDT\nBTC = $73,699  RSI 7.6\nDeepest oversold of the night\nModel doubles down: YES $73,499–73,799\n+ NO on $74,799+ (400 errors — bug a)", fillcolor="#0a2a2a", color="#66ffff"];
+    t2 [label="02:30 CDT\nBTC = $73,746  RSI 53.0\nModel starts hedging:\nNO on $73,799 (opposing earlier YES)\nBUG: conviction was only 0.114", fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+    t3 [label="02:40 CDT\nBTC = $73,683  RSI 58.9\nNO on $73,699 (opposing 02:10 YES)\nPortfolio has YES+NO on same strikes\n→ narrow $100 profitable corridor", fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+    t4 [label="03:10–03:40 CDT\nBTC rallies: $73,789 → $74,135\n+$436 in 30 min\nModel keeps placing (20 orders total)\n$59.21 deployed on single expiry", fillcolor="#1a2a1a", color="#39ff14"];
+    t5 [label="03:40 CDT — PEAK\nPortfolio = $86.03\n(cash $27.77 + $58.26 deployed)\nHWM set", fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", penwidth=3];
+    t6 [label="04:00 CDT — SETTLEMENT\nBTC ≈ $74,200\nNO on $73,899–$74,199: ALL LOSE\nYES on $73,399–73,799: all win\nbut payout $16 on $59.21 deployed", fillcolor="#3a0a0a", color="#ff3333", fontcolor="#ff9999", penwidth=3];
+    t7 [label="04:10 CDT\nPortfolio = $38.29\n−$47.74 (−55.5%)\nDrawdown halt triggers", fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999"];
+
+    t0 -> t1 -> t2 -> t3 -> t4 -> t5 -> t6 -> t7;
+
+    // Right-side: gates that now catch this
+    subgraph cluster_fixes {
+        label="Gates that now prevent this shape";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        f1 [label="conviction gate\n02:30 NO had conv=0.114 < 0.15\n→ SKIPPED before placement",
+            fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        f2 [label="netting reconciliation\n02:40 NO opposes 02:10 YES\nconv 0.114 < override threshold 0.30\n→ SKIP-OPP",
+            fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        f3 [label="top-N cap (3)\n20 orders → capped to 3/run\nfewer strikes → wider profitable range",
+            fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        f4 [label="expiry exposure cap (50%)\n$59.21 on single expiry = 68%\nwould cap at ~$43 ($86×50%)",
+            fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        f5 [label="regime detector\nRSI 7.6 at 02:20 < 20\n→ stakes halved",
+            fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        f6 [label="real side-price gate\n100¢ NO orders now filtered\n(were 54 errors per night)",
+            fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+    }
+
+    t2 -> f1 [style=dashed, color="#aaff66", label="catches"];
+    t3 -> f2 [style=dashed, color="#aaff66", label="catches"];
+    t4 -> f3 [style=dashed, color="#aaff66", label="limits"];
+    t5 -> f4 [style=dashed, color="#aaff66", label="caps $"];
+    t1 -> f5 [style=dashed, color="#aaff66", label="halves"];
+    t1 -> f6 [style=dashed, color="#aaff66", label="blocks 400s"];
+}

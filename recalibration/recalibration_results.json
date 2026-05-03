@@ -1,0 +1,131 @@
+{
+  "early": {
+    "bucket": "early",
+    "pkl_in": "/home/jeb/programs/gemini_trader/time_series/classifier_early.pkl",
+    "pkl_out": "/home/jeb/programs/gemini_trader/time_series/classifier_early_v2.pkl",
+    "before": {
+      "name": "before",
+      "YES": {
+        "n": 87384,
+        "mean_claimed": 0.9496,
+        "mean_actual": 0.9598,
+        "overconfidence": -0.0102,
+        "brier": 0.0306,
+        "log_loss": 0.1072
+      },
+      "NO": {
+        "n": 86820,
+        "mean_claimed": 0.9559,
+        "mean_actual": 0.9582,
+        "overconfidence": -0.0023,
+        "brier": 0.0319,
+        "log_loss": 0.112
+      }
+    },
+    "after": {
+      "name": "after",
+      "YES": {
+        "n": 87352,
+        "mean_claimed": 0.9497,
+        "mean_actual": 0.9599,
+        "overconfidence": -0.0102,
+        "brier": 0.0306,
+        "log_loss": 0.107
+      },
+      "NO": {
+        "n": 86852,
+        "mean_claimed": 0.9558,
+        "mean_actual": 0.958,
+        "overconfidence": -0.0022,
+        "brier": 0.032,
+        "log_loss": 0.1122
+      }
+    }
+  },
+  "mid": {
+    "bucket": "mid",
+    "pkl_in": "/home/jeb/programs/gemini_trader/time_series/classifier_mid.pkl",
+    "pkl_out": "/home/jeb/programs/gemini_trader/time_series/classifier_mid_v2.pkl",
+    "before": {
+      "name": "before",
+      "YES": {
+        "n": 85448,
+        "mean_claimed": 0.939,
+        "mean_actual": 0.9529,
+        "overconfidence": -0.014,
+        "brier": 0.0385,
+        "log_loss": 0.1385
+      },
+      "NO": {
+        "n": 88621,
+        "mean_claimed": 0.9298,
+        "mean_actual": 0.9274,
+        "overconfidence": 0.0025,
+        "brier": 0.0517,
+        "log_loss": 0.1779
+      }
+    },
+    "after": {
+      "name": "after",
+      "YES": {
+        "n": 85618,
+        "mean_claimed": 0.9383,
+        "mean_actual": 0.952,
+        "overconfidence": -0.0137,
+        "brier": 0.039,
+        "log_loss": 0.1396
+      },
+      "NO": {
+        "n": 88451,
+        "mean_claimed": 0.9309,
+        "mean_actual": 0.9281,
+        "overconfidence": 0.0027,
+        "brier": 0.0513,
+        "log_loss": 0.177
+      }
+    }
+  },
+  "late": {
+    "bucket": "late",
+    "pkl_in": "/home/jeb/programs/gemini_trader/time_series/classifier_late.pkl",
+    "pkl_out": "/home/jeb/programs/gemini_trader/time_series/classifier_late_v2.pkl",
+    "before": {
+      "name": "before",
+      "YES": {
+        "n": 85947,
+        "mean_claimed": 0.8965,
+        "mean_actual": 0.9197,
+        "overconfidence": -0.0232,
+        "brier": 0.0632,
+        "log_loss": 0.2199
+      },
+      "NO": {
+        "n": 87762,
+        "mean_claimed": 0.9056,
+        "mean_actual": 0.8911,
+        "overconfidence": 0.0144,
+        "brier": 0.08,
+        "log_loss": 0.2767
+      }
+    },
+    "after": {
+      "name": "after",
+      "YES": {
+        "n": 86012,
+        "mean_claimed": 0.8963,
+        "mean_actual": 0.9194,
+        "overconfidence": -0.0231,
+        "brier": 0.0634,
+        "log_loss": 0.2204
+      },
+      "NO": {
+        "n": 87697,
+        "mean_claimed": 0.9059,
+        "mean_actual": 0.8914,
+        "overconfidence": 0.0145,
+        "brier": 0.0799,
+        "log_loss": 0.2766
+      }
+    }
+  }
+}

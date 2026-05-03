@@ -1,0 +1,60 @@
+// 22 — 2026-04-15 evening: what happened vs what WOULD have happened with the streak breaker
+digraph counterfactual {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    label="2026-04-15 evening — actual vs counterfactual with streak breaker";
+    labelloc=t; fontcolor="#aaff66"; fontname="JetBrains Mono"; fontsize=14;
+
+    // ── Left column: what actually happened ────────────────────
+    subgraph cluster_actual {
+        label="ACTUAL (no streak breaker)";
+        style="rounded,filled"; color="#ff3333"; fillcolor="#1a0808"; fontcolor="#ff9999"; penwidth=2;
+
+        a1 [label="18:10–18:40\n12 trades placed: ALL NO\n$31.36 staked on 20:00 expiry\nBTC ≈ $74,750  RSI 33–83",
+            fillcolor="#2a0a0a", color="#ff6666"];
+        a2 [label="20:00 SETTLEMENT\nBTC rallied → NO bets lose\nportfolio: $42.56 → $27.66\n−$14.90 (−35%)",
+            fillcolor="#3a0a0a", color="#ff3333", fontcolor="#ff9999", penwidth=3];
+        a3 [label="20:10–21:20\n9 more trades: ALL NO\n$28.94 staked on 22:00 + 23:00\nmodel still stubbornly bearish",
+            fillcolor="#2a0a0a", color="#ff6666"];
+        a4 [label="22:00 SETTLEMENT\nBTC still high → NO bets lose again\nportfolio: $32.83 → $19.60\n−$13.23 (−40%)",
+            fillcolor="#3a0a0a", color="#ff3333", fontcolor="#ff9999", penwidth=3];
+        a5 [label="22:10\nDrawdown halt at 62.6%\ntotal evening loss: −$22.96",
+            fillcolor="#2a0a0a", color="#ff6666"];
+
+        a1 -> a2 -> a3 -> a4 -> a5 [color="#ff3333"];
+    }
+
+    // ── Right column: counterfactual with streak breaker ──────
+    subgraph cluster_counterfactual {
+        label="COUNTERFACTUAL (with streak breaker)";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        c1 [label="18:10–18:40\nsame 12 trades: ALL NO\n$31.36 staked on 20:00 expiry\n(identical to actual)",
+            fillcolor="#0a2a0a", color="#39ff14"];
+        c2 [label="20:00 SETTLEMENT — LOSS\nportfolio: $42.56 → $27.66\nstreak: consecutive_losses = 1\nlast_loss_side = NO",
+            fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+        c3 [label="20:10\nDeploy for 22:00 expiry...\nBUT streak = 1, next loss would\ntrigger cooldown. Trading continues\n(need 2 to halt).",
+            fillcolor="#0a2a0a", color="#39ff14"];
+        c3b [label="21:xx settlement\n(if another loss occurs here)\n→ consecutive_losses = 2\n→ COOLDOWN 60 min\n→ 22:00 trades NOT placed",
+             fillcolor="#0a3a3a", color="#66ffff", fontcolor="#ccffff", penwidth=3];
+        c4 [label="22:00 SETTLEMENT\nno positions open (cooldown)\ncash stays at ~$27–32\nNO second loss",
+            fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", penwidth=3];
+        c5 [label="~23:10\ncooldown expires\nstreak reset to 0\nresume with fresh signal",
+            fillcolor="#0a2a0a", color="#39ff14"];
+
+        c1 -> c2 -> c3 -> c3b -> c4 -> c5 [color="#39ff14"];
+    }
+
+    // Cross-links showing the divergence
+    a2 -> c2 [label="same loss", style=dashed, color="#ffaa00", constraint=false];
+    a3 -> c3b [label="divergence point:\nbreaker fires here", style=dashed, color="#ff66ff", constraint=false, penwidth=2];
+
+    // Savings box
+    savings [label="SAVED: $13.23\n(the entire 22:00 settlement loss)\n\nPortfolio without breaker: $19.60\nPortfolio with breaker:    ~$32\n\nDrawdown without: 62.6% → HALT\nDrawdown with:    ~39%  → still trading",
+             shape=note, fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", penwidth=3];
+    c4 -> savings [style=dotted, arrowhead=none, color="#aaff66"];
+}

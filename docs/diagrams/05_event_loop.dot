@@ -1,0 +1,52 @@
+// 05 — Event loop: what happens on each iteration of the tokio runtime
+digraph event_loop {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6",
+          style="filled,rounded", shape=box, fillcolor="#1a1f2e", penwidth=2, color="#39ff14"];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=9, penwidth=1.2];
+
+    start [label="main.rs\ntokio::main → App::new", fillcolor="#1a3a1a", color="#aaff66", penwidth=3];
+
+    subgraph cluster_select {
+        label="tokio::select! on each tick";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#00ffff"; penwidth=2;
+        input [label="1. keyboard\ncrossterm poll()", fillcolor="#1a2a2a", color="#66ffff"];
+        tickm [label="2. market fetch tick\n(every refresh_s)", fillcolor="#1a2a2a", color="#66ffff"];
+        tickp [label="3. command channel\n(manual triggers)", fillcolor="#1a2a2a", color="#66ffff"];
+        drain [label="4. fetch-result channel\n(background task results)", fillcolor="#1a2a2a", color="#66ffff"];
+    }
+
+    subgraph cluster_handle {
+        label="handlers (App methods)";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffaa00"; penwidth=2;
+        keys    [label="on_key\ntab switch · refresh · w/l score · quit", color="#ffcc66", fillcolor="#2a1a0a"];
+        spawn_m [label="spawn market fetch\n(tokio task)", color="#ffcc66", fillcolor="#2a1a0a"];
+        spawn_M [label="spawn model poll\n(python subprocess)", color="#ffcc66", fillcolor="#2a1a0a"];
+        spawn_S [label="spawn status collect\n(systemctl + SQL)", color="#ffcc66", fillcolor="#2a1a0a"];
+        apply   [label="apply result\nupdate App state", color="#ffcc66", fillcolor="#2a1a0a"];
+    }
+
+    draw [label="draw frame\nRatatui render\n~60 fps cap", fillcolor="#2a1a2a", color="#ff66ff", penwidth=3];
+
+    start -> input;
+    start -> tickm;
+    start -> tickp;
+    start -> drain;
+
+    input -> keys;
+    keys  -> spawn_m [label="r"];
+    keys  -> spawn_M [label="m"];
+    keys  -> spawn_S [label="s"];
+    keys  -> draw    [label="tab key"];
+
+    tickm -> spawn_m;
+    tickp -> spawn_m [style=dashed, label="Refresh"];
+    tickp -> spawn_M [style=dashed, label="ModelRefresh"];
+    tickp -> spawn_S [style=dashed, label="StatusRefresh"];
+
+    drain -> apply;
+    apply -> draw;
+    draw  -> input [style=dashed, label="loop"];
+}

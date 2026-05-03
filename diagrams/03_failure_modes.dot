@@ -1,0 +1,87 @@
+// 03 — Failure modes encountered and the gates that catch them
+// Red = the failure / loss event
+// Green = the gate that prevents it now
+// Orange = open / partially mitigated
+digraph failure_modes {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6",
+          style="filled,rounded", shape=box, penwidth=2];
+    edge [fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // ── Failure cluster ───────────────────────────────────────────
+    subgraph cluster_failures {
+        label="Past Failures";
+        style="rounded,filled"; color="#ff3333"; fillcolor="#1a0a0a"; fontcolor="#ff6666"; penwidth=2;
+
+        f_lstm    [label="LSTM regime drift\n(2026-04-13)\nabsolute price model trained\non $60–126k range\npredicted $76k when BTC at $71k",
+                   fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+        f_cuda    [label="GPU OOM mid-tick\n(2026-04-14 17:30)\nOllama loaded 14B model\nXGBoost cudaErrorMemoryAllocation",
+                   fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+        f_mae     [label="Phantom edge from MAE\n(2026-04-13 21:00)\nmodel uncertainty $3,999 wide\nevery strike looked like edge",
+                   fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+        f_thin    [label="Thin-contract trap\n(2026-04-13 00:30)\n2¢ market price\nGaussian saw 30× edge",
+                   fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+        f_400     [label="100¢ API rejects\n(54/night, 2026-04-14/15)\nfilter used 1-yes_price\nbut order used no_price",
+                   fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+        f_collide [label="Opposing same-strike bets\n(2026-04-15 04:00 -55%)\nclassifier flipped between runs\nYES+NO accumulated on T73699",
+                   fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+        f_sprawl  [label="Strike sprawl\n(2026-04-15 04:00)\n20 orders across 11 strikes\n$100-wide profitable corridor",
+                   fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+    }
+
+    // ── Mitigation cluster ────────────────────────────────────────
+    subgraph cluster_gates {
+        label="Active Mitigations";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        g_lstm    [label="LSTM RETIRED 2026-04-14\nclassifier-only path\nskip-on-failure, never fallback",
+                   fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        g_cpu     [label="classifier_device.py\nprobe nvidia-smi for ≥1500 MiB\nelse CUDA_VISIBLE_DEVICES=''",
+                   fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        g_mae     [label="MAE_MAX_DOLLARS gate\n(now moot — classifier doesn't\nproduce MAE; kept for safety)",
+                   fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        g_min     [label="MIN_CONTRACT_CENTS=10\nMAX_PROB_RATIO=3×\nrejects extreme thin contracts",
+                   fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        g_price   [label="★ Gate uses ACTUAL side-price\n(yes_price for YES, no_price for NO)\n2026-04-15 fix",
+                   fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        g_recon   [label="★ Position reconciliation\nGET /portfolio/positions\ndrop opposing-side opps\n2026-04-15 fix",
+                   fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        g_cap     [label="★ Top-N cap\nMAX_PLACEMENTS_PER_RUN=3\n2026-04-15 fix",
+                   fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+        g_dd      [label="DRAWDOWN_HALT=50%\nportfolio = cash + open_cost\n(not just cash)",
+                   fillcolor="#0a2a0a", color="#39ff14", fontcolor="#aaffaa"];
+    }
+
+    // ── Open issues ───────────────────────────────────────────────
+    subgraph cluster_open {
+        label="Open / partially mitigated";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+
+        o_conv   [label="Conviction gate (proposed)\nrequire |clf_prob-0.5| ≥ N\nthe 04:00 NO had clf_prob=0.614",
+                  fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+        o_net    [label="Stake-side netting (proposed)\ncurrent reconciliation = binary block\nshould reduce existing position",
+                  fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+        o_expiry [label="Per-expiry exposure cap (proposed)\nlimit total cost across all\nstrikes for one settlement",
+                  fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+        o_var    [label="Variance, not drift\noccasional -55% settlement events\nare statistically expected\nat current sizing — accepted risk",
+                  fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+    }
+
+    // ── Wiring ────────────────────────────────────────────────────
+    edge [color="#39ff14"];
+    f_lstm    -> g_lstm;
+    f_cuda    -> g_cpu;
+    f_mae     -> g_mae;
+    f_thin    -> g_min;
+    f_400     -> g_price;
+    f_collide -> g_recon;
+    f_sprawl  -> g_cap;
+
+    edge [color="#ffaa00", style=dashed];
+    f_collide -> o_conv  [label="weak signal\nstill placed"];
+    f_collide -> o_net   [label="block-only,\ndoes not unwind"];
+    f_sprawl  -> o_expiry [label="top-N caps count,\nnot total $"];
+    g_dd      -> o_var    [label="catches catastrophe,\nnot variance"];
+}

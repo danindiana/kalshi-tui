@@ -1,0 +1,53 @@
+// 02 — Per-run pipeline: what auto_trader.py does on each 10-min tick
+// Highlights the new gates (purple = post-mortem additions)
+digraph per_run_flow {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", color="#39ff14",
+          style="filled,rounded", shape=box, fillcolor="#1a1f2e", penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    start    [label="systemd timer fires\n(every 10 min)", shape=oval, fillcolor="#0a3a0a", color="#39ff14", penwidth=3];
+    auth     [label="Load RSA key\nKalshiSigner.from_config()"];
+    bal      [label="GET /portfolio/balance\nGET /portfolio/positions"];
+    halt1    [label="Halt: Balance API down?", shape=diamond, fillcolor="#3a0a0a", color="#ff3333", fontcolor="#ff9999"];
+    halt2    [label="Halt: balance < $5\nor drawdown ≥ 50%?", shape=diamond, fillcolor="#3a0a0a", color="#ff3333", fontcolor="#ff9999"];
+    halt3    [label="Halt: daily cap hit?", shape=diamond, fillcolor="#3a0a0a", color="#ff3333", fontcolor="#ff9999"];
+    window   [label="Find next settlement\n(within 90 min only)"];
+    candles  [label="Fetch 1440 1m candles\nfrom Gemini"];
+    feats    [label="Build features:\nrel_ma, vol, momentum,\nRSI, ma_slope, amount"];
+    clf      [label="Run XGBoost classifier\n(GPU or CPU fallback)\n→ P(price > strike) per strike"];
+    edge_g   [label="Per-strike edge gates:\n• edge ≥ 5%\n• 10¢ ≤ price < 95¢*\n• prob/price ratio ≤ 3×", fillcolor="#1a2a1a"];
+    sort     [label="Sort opportunities by edge ↓"];
+
+    // ── NEW gates from this session ───────────────────────────────
+    recon    [label="★ NEW: position reconciliation\nGET /portfolio/positions::market_positions\ndrop opps that oppose held side",
+              fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+    cap      [label="★ NEW: top-N cap\nMAX_PLACEMENTS_PER_RUN=3\nkeep top-N by edge",
+              fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+
+    place    [label="For each surviving opp:\n• Kelly stake (33% of full)\n• count = stake / price\n• POST /portfolio/orders"];
+    log_s    [label="UPDATE runs SET trades_placed=N\nINSERT trades (per order)\nappend log line", shape=cylinder, fillcolor="#2a1a0a", color="#ffcc66"];
+    done     [label="exit 0", shape=oval, fillcolor="#0a3a0a", color="#39ff14", penwidth=3];
+
+    // halts
+    skip1    [label="[STOP] standing down", shape=oval, fillcolor="#3a0a0a", color="#ff3333"];
+    skip2    [label="[STOP] standing down", shape=oval, fillcolor="#3a0a0a", color="#ff3333"];
+    skip3    [label="[STOP] daily cap", shape=oval, fillcolor="#3a0a0a", color="#ff3333"];
+
+    start -> auth -> bal -> halt1;
+    halt1 -> skip1   [label="yes", color="#ff3333"];
+    halt1 -> halt2   [label="no"];
+    halt2 -> skip2   [label="yes", color="#ff3333"];
+    halt2 -> halt3   [label="no"];
+    halt3 -> skip3   [label="yes", color="#ff3333"];
+    halt3 -> window  [label="no"];
+
+    window -> candles -> feats -> clf -> edge_g -> sort -> recon -> cap -> place -> log_s -> done;
+
+    // footnote
+    note     [label="* gate uses ACTUAL side-price\n(yes_price for YES, no_price for NO)\n— bug (a) fix this session",
+              shape=note, fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+    edge_g -> note [style=dotted, color="#ffaa00", arrowhead=none];
+}

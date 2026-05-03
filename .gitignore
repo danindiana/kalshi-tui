@@ -1,0 +1,25 @@
+/target
+*.swp
+*.pem
+*.p12
+.env
+.env.*
+!.env.example
+config.toml
+/out
+/dist
+
+# Python
+__pycache__/
+*.pyc
+
+# Model binaries (large; not tracked in git)
+time_series/*.pkl
+time_series/*.keras
+time_series/scaler_*.pkl
+
+# Local databases (sensitive trade data)
+*.db
+
+# SHA checksum files (generated artifacts)
+SHA256SUMS

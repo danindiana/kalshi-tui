@@ -1,0 +1,27 @@
+{
+  "trained_at": "2026-04-14T11:17:47.121211",
+  "model_type": "delta",
+  "mae": 25.013071060180664,
+  "bias": -0.1576501876115799,
+  "seq_len": 30,
+  "feature_cols": [
+    "price_rel_ma",
+    "amount",
+    "price_volatility",
+    "price_momentum",
+    "rsi",
+    "ma_slope"
+  ],
+  "days_of_data": 90,
+  "epochs_run": 17,
+  "backtest": {
+    "bets": 0,
+    "wins": 0,
+    "win_rate": 0,
+    "total_pnl": 0.0,
+    "avg_ev": 0,
+    "calib_mae": 1.0,
+    "deployable": false
+  },
+  "chronological_split": true
+}

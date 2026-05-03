@@ -1,0 +1,53 @@
+// 08 — Per-expiry exposure cap: how $ accumulates per settlement and where the cap kicks in
+digraph expiry_cap {
+    rankdir=LR;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    // Input
+    portfolio [label="portfolio_value\n= cash + open_cost\n(capped at MAX_BANKROLL $500)",
+               fillcolor="#0a2a2a", color="#66ffff", fontcolor="#ccffff", penwidth=3];
+
+    cap_calc  [label="expiry_cap\n= portfolio_value × 0.50", fillcolor="#1a2a1a", color="#39ff14"];
+
+    // API seed
+    api [label="GET /portfolio/positions\n→ event_positions[].total_cost_dollars",
+         fillcolor="#2a1a2a", color="#ff66ff", fontcolor="#ffccff"];
+    seed [label="expiry_cost = {\n  KXBTCD-26APR1500: $59.21,\n  KXBTCD-26APR1505: $12.40,\n  KXBTCD-26APR1510: $0.00\n}",
+          shape=cylinder, fillcolor="#2a1a0a", color="#ffaa00"];
+
+    api -> seed;
+
+    // Per-opp iteration
+    opp [label="next opportunity\nticker = KXBTCD-26APR1504-T74099.99", fillcolor="#1a2a1a", color="#39ff14"];
+    evkey [label="event_ticker_of(ticker)\n= KXBTCD-26APR1504\n(strip -T<strike>)", fillcolor="#1a2a1a", color="#39ff14"];
+
+    check [label="expiry_cost[event]\n+ this_cost\n  ≤  expiry_cap?",
+           shape=diamond, fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3];
+
+    place [label="POST /portfolio/orders\nexpiry_cost[event] += this_cost",
+           fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", shape=oval];
+
+    skip [label="[SKIP] expiry cap\nexposure X + Y > cap Z",
+          fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+
+    portfolio -> cap_calc;
+    cap_calc  -> check;
+    seed      -> check;
+    opp       -> evkey -> check;
+    check     -> place [label="yes", color="#39ff14"];
+    check     -> skip  [label="no",  color="#ff3333"];
+    place     -> seed  [label="update\n(accumulate)", color="#aaff66", style=dashed];
+
+    // Live snapshot annotation
+    note [label="Live example — 2026-04-15 19:41 CDT\nportfolio = $42.56 → cap $21.28\nexisting 21:00 expiry cost = $24.90\n→ all 3 new strikes SKIPPED\n(would push to $27.80 vs cap $21.28)",
+          shape=note, fillcolor="#2a1a0a", color="#ffaa00", fontcolor="#ffcc66"];
+    skip -> note [style=dotted, arrowhead=none, color="#ffaa00"];
+
+    // Failure-shape annotation
+    rock [label="Failure shape it catches —\n2026-04-15 04:00 had $59.21\non single expiry vs $86.03 portfolio\n(68% > 50% cap)\n→ gate would have blocked\nthe last ~$15 of over-allocation",
+          shape=note, fillcolor="#2a0a0a", color="#ff6666", fontcolor="#ffcccc"];
+    check -> rock [style=dotted, arrowhead=none, color="#ff6666"];
+}

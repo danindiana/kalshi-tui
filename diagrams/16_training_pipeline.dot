@@ -1,0 +1,66 @@
+// 16 — Training data pipeline: CSV → features → samples → chrono split → GPU train → gate
+digraph training {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    csv [label="historical_candle_data_btcusd_full.csv\n523K rows × 1-min candles\n~364 days", fillcolor="#2a1a0a", color="#ffaa00", shape=cylinder, penwidth=3];
+
+    trim [label="trim to --days 90\n→ ~129K bars", fillcolor="#1a2a1a", color="#39ff14"];
+
+    feats [label="load_and_engineer()\nprice_rel_ma, volatility,\nmomentum, rsi, ma_slope, amount\n(rolling window = 5)", fillcolor="#1a2a1a", color="#39ff14"];
+
+    split [label="chronological split\n85% train | 15% test\n(train further split 90/10 for val)\nNEVER shuffled",
+           fillcolor="#1a2a1a", color="#39ff14"];
+
+    subgraph cluster_samples {
+        label="build_samples() per horizon";
+        style="rounded,filled"; color="#ff66ff"; fillcolor="#1a0a1a"; fontcolor="#ff66ff"; penwidth=2;
+
+        samp [label="for each bar i:\n  future = price[i + horizon]\n  for k in −4..+4:\n    strike = round(price/250)*250 + k*250\n    dist = (strike − price) / price\n    y = 1 if future > strike else 0\n    X = [6 feats, dist, horizon]",
+              fillcolor="#2a0a2a", color="#ff66ff", fontcolor="#ffccff"];
+        multi [label="unified: all 12 horizons\n→ 6.2M samples\n\nensemble: per-bucket horizons\n→ 2.7M / 3.6M / 4.4M",
+               fillcolor="#2a0a2a", color="#ff66ff", fontcolor="#ffccff"];
+    }
+
+    subgraph cluster_train {
+        label="XGBoost GPU training";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#66ffff"; penwidth=2;
+
+        xgb [label="XGBClassifier\ndevice='cuda' (dual GPU via NCCL)\nn_estimators=1000, max_depth=6\nlr=0.05, subsample=0.8\nearly_stopping_rounds=30",
+             fillcolor="#0a2a2a", color="#66ffff"];
+        iso [label="IsotonicRegression\non validation set\n→ calibrated P(y=1)",
+             fillcolor="#0a2a2a", color="#66ffff"];
+        wrap [label="CalibratedXGB(base, iso)\npickled as .pkl",
+              fillcolor="#0a2a2a", color="#66ffff"];
+    }
+
+    subgraph cluster_gate {
+        label="Deployment gate";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        bt [label="backtest()\nsimulate Kalshi bets on test set:\n  • strike discovery\n  • edge ≥ 5%\n  • min-contract, max-ratio gates\n  • track bets, wins, PnL",
+            fillcolor="#0a2a0a", color="#39ff14"];
+        gate [label="avg_ev > 0\nAND bets ≥ 50?", shape=diamond,
+              fillcolor="#0a2a0a", color="#39ff14"];
+    }
+
+    ship [label="classifier_{bucket}.pkl\nwritten to time_series/\n+ training_metrics_{bucket}.json",
+          fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", shape=oval, penwidth=3];
+    reject [label="REJECT\n(rerun with --force to override)",
+            fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+
+    csv -> trim -> feats -> split;
+    split -> samp -> multi;
+    multi -> xgb -> iso -> wrap;
+    wrap -> bt -> gate;
+    gate -> ship [label="yes", color="#aaff66"];
+    gate -> reject [label="no", color="#ff3333"];
+
+    // Timing annotation
+    timing [label="Wall clock:\ndata prep: ~14 min (CPU-bound)\nGPU training: 2–3s\ncalibration: <1s\nbacktest: ~10s",
+            shape=note, fillcolor="#2a1a0a", color="#ffcc66", fontcolor="#ffcc66"];
+    xgb -> timing [style=dotted, arrowhead=none, color="#ffcc66"];
+}

@@ -1,0 +1,93 @@
+// 14 — Testing strategy: layers from unit → integration → backtest → production
+digraph testing {
+    rankdir=TB;
+    bgcolor="#0a0e14";
+    fontname="JetBrains Mono";
+    node [fontname="JetBrains Mono", fontcolor="#e6e6e6", style="filled,rounded", shape=box, penwidth=2];
+    edge [color="#39ff14", fontcolor="#cccccc", fontname="JetBrains Mono", fontsize=10, penwidth=1.5];
+
+    change [label="proposed change\n(new gate / feature / sizing)",
+            fillcolor="#3a0a3a", color="#ff66ff", fontcolor="#ffccff", penwidth=3, shape=oval];
+
+    // Layer 1: unit tests
+    subgraph cluster_unit {
+        label="1 — Unit tests  (seconds, pure Python)";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        t1 [label="tests/test_phaseA.py\n14 scenarios:\n• conviction gate\n• regime scaling\n• netting reconciliation\n• expiry cap",
+            fillcolor="#0a2a0a", color="#39ff14"];
+        t2 [label="tests/test_reconciliation.py\n6 scenarios incl.\n04:00 regression",
+            fillcolor="#0a2a0a", color="#39ff14"];
+        t3 [label="regression cases for\nevery past incident\n(reassert with each change)",
+            fillcolor="#0a2a0a", color="#39ff14"];
+    }
+
+    // Layer 2: DRY_RUN integration
+    subgraph cluster_dry {
+        label="2 — DRY_RUN integration (1 min, hits live APIs, no real orders)";
+        style="rounded,filled"; color="#00ffff"; fillcolor="#0a1a1a"; fontcolor="#66ffff"; penwidth=2;
+
+        d1 [label="DRY_RUN=1 DRAWDOWN_HALT=1.0 \\\nDAILY_LOSS_PCT=100 \\\n./venv/bin/python auto_trader.py",
+            fillcolor="#0a2a2a", color="#66ffff"];
+        d2 [label="verify:\n• classifier runs\n• gates log as expected\n• no 400 errors\n• DB writes succeed",
+            fillcolor="#0a2a2a", color="#66ffff"];
+    }
+
+    // Layer 3: backtest gate
+    subgraph cluster_bt {
+        label="3 — Backtest gate (only when model changes)";
+        style="rounded,filled"; color="#ffaa00"; fillcolor="#1a1408"; fontcolor="#ffcc66"; penwidth=2;
+
+        b1 [label="backtest_gates.py\nreplay known incidents +\nforward sim on 90d holdout",
+            fillcolor="#2a1a0a", color="#ffaa00"];
+        b2 [label="require:\nWR ≥ 68.3%\navg EV ≥ +0.099\nno regressions on known cases",
+            fillcolor="#2a1a0a", color="#ffaa00"];
+    }
+
+    // Layer 4: production canary
+    subgraph cluster_canary {
+        label="4 — Production canary (manual, ~30 min)";
+        style="rounded,filled"; color="#ff66ff"; fillcolor="#1a0a1a"; fontcolor="#ffccff"; penwidth=2;
+
+        c1 [label="sudo systemctl daemon-reload\nsudo systemctl start kalshi-auto-trader.service\n(force one tick)",
+            fillcolor="#2a0a2a", color="#ff66ff"];
+        c2 [label="tail -f auto_trader.log\n• gate activity present\n• orders placed/errored as expected\n• portfolio sane",
+            fillcolor="#2a0a2a", color="#ff66ff"];
+    }
+
+    // Layer 5: live monitoring
+    subgraph cluster_live {
+        label="5 — Live monitoring (continuous)";
+        style="rounded,filled"; color="#39ff14"; fillcolor="#0a1a0a"; fontcolor="#aaff66"; penwidth=2;
+
+        m1 [label="investigate_recent.py [hours]\nOOS WR/EV vs training",
+            fillcolor="#0a2a0a", color="#39ff14"];
+        m2 [label="drawdown halt\nhwm.json tracking\n(automatic)",
+            fillcolor="#0a2a0a", color="#39ff14"];
+        m3 [label="kalshi-tui System tab\nreal-time audit UI",
+            fillcolor="#0a2a0a", color="#39ff14"];
+    }
+
+    // Outcomes
+    ship [label="SHIP to production",
+          fillcolor="#0a3a0a", color="#39ff14", fontcolor="#aaffaa", penwidth=3, shape=oval];
+    reject [label="REJECT — fix & loop",
+            fillcolor="#2a0a0a", color="#ff3333", fontcolor="#ff9999", shape=oval];
+
+    change -> t1;
+    change -> t2;
+    t1 -> d1 [label="all pass"];
+    t2 -> d1;
+    t3 -> t1 [style=dotted, color="#aaff66"];
+    d1 -> d2 -> b1;
+    b1 -> b2;
+    b2 -> c1 [label="pass", color="#aaff66"];
+    b2 -> reject [label="fail", color="#ff3333"];
+    c1 -> c2 -> ship;
+    ship -> m1 [label="audit weekly"];
+    ship -> m2;
+    ship -> m3;
+
+    // Shortcut: non-model changes skip backtest
+    d2 -> c1 [label="non-model change\n(gate only)", style=dashed, color="#aaff66"];
+}
