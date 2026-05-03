@@ -22,13 +22,16 @@ GEMINI_TRADER_DIR = "/home/jeb/programs/gemini_trader"
 DB_PATH           = Path.home() / ".local" / "share" / "kalshi-tui" / "auto_trader.db"
 KALSHI_BASE       = "https://api.elections.kalshi.com/trade-api/v2"
 
-sys.path.insert(0, str(SCRIPTS_DIR))
 sys.path.insert(0, GEMINI_TRADER_DIR)
 
-# Import auto_trader to reuse run_classifier and helpers.
-# The `if __name__ == "__main__"` guard in auto_trader.py prevents run() from
-# executing on import; all module-level constants and functions are available.
-import auto_trader as at
+# Load the workspace auto_trader.py by absolute path so we always get the
+# version with the 4-arg run_classifier(signer, ...) and OB features, even
+# when the older 3-arg gemini_trader copy is earlier on sys.path.
+import importlib.util as _ilu
+_at_spec = _ilu.spec_from_file_location("auto_trader", str(SCRIPTS_DIR / "auto_trader.py"))
+at = _ilu.module_from_spec(_at_spec)
+sys.modules["auto_trader"] = at
+_at_spec.loader.exec_module(at)
 
 # ── DB schema additions ───────────────────────────────────────────────────────
 
