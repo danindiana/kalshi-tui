@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph},
     Frame, Terminal,
 };
 use serde::Deserialize;
@@ -48,6 +48,32 @@ struct SessionResult {
     session_doc: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct MonitorPos {
+    ticker:      String,
+    side:        String,
+    count:       u32,
+    #[allow(dead_code)]
+    strike:      f64,
+    cost:        f64,
+    mtm:         f64,
+    unrlzd:      f64,
+    entry_cents: i64,
+    cur_cents:   i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct MonitorData {
+    mins_remaining: f64,
+    mins_elapsed:   f64,
+    total_cost:     f64,
+    total_mtm:      f64,
+    total_unrlzd:   f64,
+    positions:      Vec<MonitorPos>,
+    #[allow(dead_code)]
+    settled:        bool,
+}
+
 struct WizardState {
     step: WizardStep,
     // input buffers (raw user text)
@@ -68,6 +94,8 @@ struct WizardState {
     result: Option<SessionResult>,
     // scroll offset for the log view
     log_scroll: usize,
+    // latest parsed STATUS payload from paper_trader.py wait loop
+    monitor_data: Option<MonitorData>,
 }
 
 impl WizardState {
@@ -86,6 +114,7 @@ impl WizardState {
             error_msg: String::new(),
             result: None,
             log_scroll: 0,
+            monitor_data: None,
         }
     }
 }
@@ -341,6 +370,12 @@ fn ingest_line(state: &mut WizardState, line: String) {
             return;
         }
     }
+    if let Some(json_str) = line.strip_prefix("STATUS:") {
+        if let Ok(data) = serde_json::from_str::<MonitorData>(json_str.trim()) {
+            state.monitor_data = Some(data);
+            return; // consumed by monitoring screen; don't append to log
+        }
+    }
     state.log_lines.push(line);
     // Auto-scroll to bottom as new lines arrive
     let visible = 20usize;
@@ -372,7 +407,13 @@ fn draw_wizard(f: &mut Frame, state: &WizardState) {
         WizardStep::Cycles       => draw_cycles(f, modal, state),
         WizardStep::MaxTrades    => draw_max_trades(f, modal, state),
         WizardStep::Confirm      => draw_confirm(f, modal, state),
-        WizardStep::Running      => draw_running(f, modal, state),
+        WizardStep::Running      => {
+            if state.monitor_data.is_some() {
+                draw_monitoring(f, area, state);
+            } else {
+                draw_running(f, modal, state);
+            }
+        }
         WizardStep::Results      => draw_results(f, modal, state),
         WizardStep::Errored      => draw_error(f, modal, state),
     }
@@ -886,6 +927,165 @@ fn draw_error(f: &mut Frame, area: Rect, state: &WizardState) {
     }
 
     f.render_widget(hint("[Enter] Go back to confirm    [q] Quit"), chunks[2]);
+}
+
+// ── Monitoring screen (settlement wait loop) ──────────────────────────────────
+
+fn draw_monitoring(f: &mut Frame, area: Rect, state: &WizardState) {
+    let data = match &state.monitor_data {
+        Some(d) => d,
+        None    => return,
+    };
+
+    // Background
+    f.render_widget(
+        Block::default().style(Style::default().bg(Color::Rgb(10, 10, 20))),
+        area,
+    );
+
+    let modal = centered_modal(88, 90, area);
+    f.render_widget(Clear, modal);
+
+    let title = format!("Settlement Monitor — {:.1} min remaining", data.mins_remaining);
+    f.render_widget(modal_block(&title), modal);
+
+    let inner = inner_area(modal, 2, 1);
+
+    // Cap positions to available height
+    let max_pos = (inner.height as usize).saturating_sub(10).max(1);
+    let positions: Vec<&MonitorPos> = data.positions.iter().take(max_pos).collect();
+    let n_layout = positions.len().max(1); // reserve at least 1 slot
+
+    // Build constraints dynamically: header + n pos rows + totals chrome
+    let mut constraints = vec![
+        Constraint::Length(1), // 0: gauge label
+        Constraint::Length(1), // 1: gauge bar
+        Constraint::Length(1), // 2: spacer
+        Constraint::Length(1), // 3: column headers
+        Constraint::Length(1), // 4: separator
+    ];
+    for _ in 0..n_layout {
+        constraints.push(Constraint::Length(1));
+    }
+    let sep2_idx = 5 + n_layout;
+    let tot_idx  = sep2_idx + 1;
+    let flex_idx = tot_idx + 1;
+    let hint_idx = flex_idx + 1;
+    constraints.push(Constraint::Length(1)); // sep2
+    constraints.push(Constraint::Length(1)); // totals
+    constraints.push(Constraint::Min(0));    // flex
+    constraints.push(Constraint::Length(1)); // hint
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    // Gauge
+    let total_mins = data.mins_elapsed + data.mins_remaining;
+    let ratio = if total_mins > 0.0 {
+        (data.mins_elapsed / total_mins).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let pct = (ratio * 100.0) as u16;
+
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "Settlement countdown",
+            Style::default().fg(Color::Gray),
+        ))),
+        chunks[0],
+    );
+    f.render_widget(
+        Gauge::default()
+            .gauge_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 60)))
+            .percent(pct)
+            .label(format!("{pct}%  ·  {:.1} min to settlement", data.mins_remaining)),
+        chunks[1],
+    );
+
+    // Column headers
+    f.render_widget(
+        Paragraph::new(format!(
+            "  {:<20}  {:>3}  {:>4}  {:>6}  {:>6}  {:>7}  {:>9}  Trend",
+            "Ticker", "Side", "Qty", "Cost", "MTM", "Unrlzd", "¢In→Cur"
+        ))
+        .style(Style::default().fg(Color::DarkGray)),
+        chunks[3],
+    );
+    f.render_widget(
+        Paragraph::new("─".repeat(inner.width as usize))
+            .style(Style::default().fg(Color::DarkGray)),
+        chunks[4],
+    );
+
+    // Position rows
+    for (i, pos) in positions.iter().enumerate() {
+        let row_color = if pos.unrlzd >= 0.0 { Color::Green } else { Color::Red };
+
+        // 12-char Unicode bar; midpoint (6 filled) = at-cost; >6 = profitable
+        let fill_ratio = if pos.cost > 0.0 {
+            (pos.mtm / pos.cost).clamp(0.0, 2.0) / 2.0
+        } else {
+            0.5
+        };
+        let filled = (fill_ratio * 12.0).round() as usize;
+        let bar = format!(
+            "{}{}",
+            "█".repeat(filled),
+            "░".repeat(12usize.saturating_sub(filled))
+        );
+
+        // Show last 20 chars of ticker (drops the date prefix)
+        let tlen = pos.ticker.len();
+        let ticker_disp = if tlen > 20 { &pos.ticker[tlen - 20..] } else { &pos.ticker };
+
+        let text = format!(
+            "  {:<20}  {:>3}  {:>2}ct  ${:>5.2}  ${:>5.2}  ${:>+6.2}  {:>3}→{:<3}¢  ",
+            ticker_disp,
+            pos.side,
+            pos.count,
+            pos.cost,
+            pos.mtm,
+            pos.unrlzd,
+            pos.entry_cents,
+            pos.cur_cents,
+        );
+        f.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(text, Style::default().fg(Color::White)),
+                Span::styled(bar, Style::default().fg(row_color)),
+            ])),
+            chunks[5 + i],
+        );
+    }
+
+    // Bottom separator + totals
+    f.render_widget(
+        Paragraph::new("─".repeat(inner.width as usize))
+            .style(Style::default().fg(Color::DarkGray)),
+        chunks[sep2_idx],
+    );
+    let tot_color = if data.total_unrlzd >= 0.0 { Color::Green } else { Color::Red };
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "  TOTAL",
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(
+                    "                       ${:>5.2}  ${:>5.2}  ${:>+6.2}",
+                    data.total_cost, data.total_mtm, data.total_unrlzd
+                ),
+                Style::default().fg(tot_color).add_modifier(Modifier::BOLD),
+            ),
+        ])),
+        chunks[tot_idx],
+    );
+
+    f.render_widget(hint("[q] Quit wizard"), chunks[hint_idx]);
 }
 
 // ── Layout helpers ────────────────────────────────────────────────────────────
