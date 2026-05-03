@@ -140,6 +140,89 @@ def _resolve_settlements(con: sqlite3.Connection, session_id: int, signer,
     return wins, losses, pending
 
 
+def _print_portfolio_snapshot(
+    open_positions: list,
+    markets: list,
+    mins: float,
+    virtual_balance: float,
+    initial_balance: float,
+    cycle_num: int,
+) -> None:
+    """Print a live portfolio snapshot after each cycle."""
+    if not open_positions:
+        return
+
+    # Build ticker → current prices lookup from the markets already fetched
+    price_map: dict[str, dict] = {}
+    for m in markets:
+        price_map[m["ticker"]] = {
+            "yes": m["yes_price"],
+            "no":  m["no_price"],
+        }
+
+    total_cost   = 0.0
+    total_mtm    = 0.0
+    total_exp_pnl = 0.0
+
+    rows = []
+    for pos in open_positions:
+        ticker      = pos["ticker"]
+        side        = pos["side"].upper()
+        count       = pos["count"]
+        cost        = pos["cost_dollars"]
+        model_prob  = pos.get("model_prob", None)
+        entry_price = pos["price_cents"] / 100.0
+
+        prices = price_map.get(ticker)
+        if prices:
+            cur_price = prices["yes"] if side == "YES" else prices["no"]
+            mtm_value = count * cur_price
+        else:
+            cur_price = entry_price
+            mtm_value = cost   # can't price it, show flat
+
+        unrlzd = mtm_value - cost
+
+        # Model's expected profit at entry: (model_prob × payout) - cost
+        if model_prob is not None:
+            exp_payout = count * model_prob
+            exp_pnl    = exp_payout - cost
+        else:
+            exp_pnl = (pos.get("edge", 0) or 0) * count   # rough fallback
+
+        total_cost    += cost
+        total_mtm     += mtm_value
+        total_exp_pnl += exp_pnl
+
+        rows.append((side, pos["strike"], count, pos["price_cents"],
+                     cur_price, cost, mtm_value, unrlzd, exp_pnl))
+
+    total_unrlzd = total_mtm - total_cost
+    settle_str   = f"{mins:.0f} min" if mins > 1 else "< 1 min"
+
+    print(f"\n  ┌─ Portfolio Snapshot — cycle {cycle_num}  ({settle_str} to settlement) {'─'*10}")
+    for side, strike, count, entry_c, cur_price, cost, mtm, unrlzd, exp_pnl in rows:
+        cur_c   = round(cur_price * 100)
+        sign    = "+" if unrlzd >= 0 else ""
+        exp_s   = f"{sign}{exp_pnl:+.2f}" if unrlzd >= 0 else f"{exp_pnl:+.2f}"
+        row_str = (
+            f"  │  {side:3s} ${strike:>8,.0f}  "
+            f"{count:2d}ct  entry={entry_c}¢ → cur={cur_c}¢  "
+            f"cost=${cost:.2f}  mtm=${mtm:.2f}  "
+            f"unrlzd=${unrlzd:+.2f}  expctd=${exp_pnl:+.2f}"
+        )
+        print(row_str)
+    print(
+        f"  │  {'─'*56}\n"
+        f"  │  TOTAL  cost=${total_cost:.2f}  mtm=${total_mtm:.2f}  "
+        f"unrlzd=${total_unrlzd:+.2f}  expctd=${total_exp_pnl:+.2f}\n"
+        f"  │  Cash: ${virtual_balance:.2f}  "
+        f"Portfolio: ${virtual_balance + total_cost:.2f}  "
+        f"(started ${initial_balance:.2f})\n"
+        f"  └{'─'*57}"
+    )
+
+
 def _write_session_doc(path: Path, ts: str, initial_bal: float, max_cycles: int,
                        max_trades: int, total_trades: int, wins: int, losses: int,
                        pending: int, net_pnl: float, final_bal: float,
@@ -206,6 +289,7 @@ def run_paper_session(balance: float, max_cycles: int, max_trades: int) -> None:
     virtual_balance = balance
     total_trades    = 0
     paper_trades    = []   # list of dicts for settlement resolution
+    open_positions  = []   # same list, kept for live portfolio snapshots
 
     cycle_num = 0
     while True:
@@ -316,19 +400,30 @@ def run_paper_session(balance: float, max_cycles: int, max_trades: int) -> None:
                     count, price_cents, round(cost, 4), opp["edge"],
                 ),
             )
-            paper_trades.append({
+            entry = {
                 "id":           cur.lastrowid,
                 "ticker":       opp["ticker"],
+                "strike":       opp["strike"],
                 "side":         opp["side"],
                 "count":        count,
                 "cost_dollars": round(cost, 4),
                 "price_cents":  price_cents,
-            })
+                "model_prob":   opp.get("model_prob"),
+                "edge":         opp.get("edge"),
+            }
+            paper_trades.append(entry)
+            open_positions.append(entry)
             con.commit()
 
         print(
             f"[OK]   Cycle {cycle_num} done: "
             f"{cycle_trades} paper trade(s), ${run_spent:.2f} deployed"
+        )
+
+        # Live portfolio snapshot after every cycle
+        _print_portfolio_snapshot(
+            open_positions, markets, mins,
+            virtual_balance, balance, cycle_num,
         )
 
     # ── Settlement resolution ─────────────────────────────────────────────────
